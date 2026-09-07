@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "run_id": "run-example",
+  "plan_id": "plan-environment-01",
+  "work_units": [
+    {
+      "work_unit_id": "tree-01",
+      "intent": "tree_generation",
+      "requirements": [
+        "realistic mature tree",
+        "editable after generation",
+        "repeatable from the same method"
+      ]
+    }
+  ]
+}

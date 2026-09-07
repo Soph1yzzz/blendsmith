@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blendsmith.dev/schemas/owner_decision.schema.json",
+  "$defs": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+  "type": "object",
+  "required": ["schema_version", "run_id", "decision", "decided_at"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "decision": {"enum": ["ACCEPT", "REQUEST_REVISION", "REJECT_RUN"]},
+    "decided_at": {"type": "string", "format": "date-time"},
+    "reason": {"type": ["string", "null"]},
+    "candidate_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"decision": {"const": "ACCEPT"}}, "required": ["decision"]},
+      "then": {"required": ["candidate_sha256"], "properties": {"candidate_sha256": {"$ref": "#/$defs/sha256"}}}
+    },
+    {
+      "if": {"properties": {"decision": {"enum": ["REQUEST_REVISION", "REJECT_RUN"]}}, "required": ["decision"]},
+      "then": {"required": ["reason"], "properties": {"reason": {"type": "string", "minLength": 1}}}
+    }
+  ],
+  "additionalProperties": false
+}

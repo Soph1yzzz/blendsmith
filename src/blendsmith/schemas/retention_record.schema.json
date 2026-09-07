@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blendsmith.dev/schemas/retention_record.schema.json",
+  "$defs": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+  "type": "object",
+  "required": ["schema_version", "record_id", "relative_path", "class", "sha256", "gc_allowed", "created_at", "expires_at"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "record_id": {"type": "string", "minLength": 1},
+    "relative_path": {"type": "string", "minLength": 1},
+    "class": {"enum": ["PINNED_INSTALLATION", "PINNED_ENVIRONMENT", "PINNED_ACTIVE_CHECKPOINT", "PINNED_CURRENT_FINAL", "EPHEMERAL", "EPHEMERAL_SUPERSEDED_FINAL", "LIGHTWEIGHT_HISTORY"]},
+    "sha256": {"$ref": "#/$defs/sha256"},
+    "gc_allowed": {"type": "boolean"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": ["string", "null"], "format": "date-time"},
+    "replaced_by": {"type": ["string", "null"]}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"class": {"enum": ["PINNED_INSTALLATION", "PINNED_ENVIRONMENT", "PINNED_ACTIVE_CHECKPOINT", "PINNED_CURRENT_FINAL", "LIGHTWEIGHT_HISTORY"]}}, "required": ["class"]},
+      "then": {"properties": {"gc_allowed": {"const": false}, "expires_at": {"type": "null"}}}
+    },
+    {
+      "if": {"properties": {"class": {"enum": ["EPHEMERAL", "EPHEMERAL_SUPERSEDED_FINAL"]}}, "required": ["class"]},
+      "then": {"properties": {"gc_allowed": {"const": true}, "expires_at": {"type": "string", "format": "date-time"}}}
+    }
+  ],
+  "additionalProperties": false
+}

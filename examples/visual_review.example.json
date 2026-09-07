@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "run_id": "run-0123456789ab",
+  "candidate_id": "i0-v1-01234567",
+  "candidate_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "verdict": "ACCEPT",
+  "opened_evidence": ["front", "three_quarter"],
+  "perspectives_completed": ["structure", "surface"],
+  "issues": [],
+  "regressions": [],
+  "uncertainties": [],
+  "next_action": "Proceed to the next required gate."
+}

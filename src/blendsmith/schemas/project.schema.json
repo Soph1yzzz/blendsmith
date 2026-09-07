@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blendsmith.dev/schemas/project.schema.json",
+  "type": "object",
+  "required": ["schema_version", "project_id", "storage", "qa", "method_selection", "recovery", "provenance"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "project_id": {"type": "string", "minLength": 1},
+    "storage": {
+      "type": "object",
+      "required": ["ephemeral_ttl_hours"],
+      "properties": {"ephemeral_ttl_hours": {"type": "integer", "minimum": 1, "maximum": 720}},
+      "additionalProperties": false
+    },
+    "qa": {
+      "type": "object",
+      "required": ["live_gui_review", "max_primary_repair_issues", "max_variants_per_iteration", "minimum_render_width", "minimum_render_height", "review_max_edge", "tile_size", "tile_overlap", "jpeg_quality"],
+      "properties": {
+        "live_gui_review": {"const": "required_if_capable"},
+        "max_primary_repair_issues": {"type": "integer", "minimum": 1, "maximum": 2},
+        "max_variants_per_iteration": {"type": "integer", "minimum": 1, "maximum": 3},
+        "minimum_render_width": {"type": "integer", "minimum": 1},
+        "minimum_render_height": {"type": "integer", "minimum": 1},
+        "review_max_edge": {"type": "integer", "minimum": 1},
+        "tile_size": {"type": "integer", "minimum": 64},
+        "tile_overlap": {"type": "integer", "minimum": 0},
+        "jpeg_quality": {"type": "integer", "minimum": 1, "maximum": 100},
+        "required_evidence": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "required_perspectives": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      },
+      "additionalProperties": false
+    },
+    "method_selection": {
+      "type": "object",
+      "required": ["required", "required_discovery_sources", "scratch_requires_specialized_exhaustion", "require_catalog_hint_accounting"],
+      "properties": {
+        "required": {"const": true},
+        "required_discovery_sources": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["BLENDER_NATIVE", "GEOMETRY_NODE_TOOLS", "ASSET_LIBRARIES", "EXTENSIONS", "PROJECT_CATALOG", "ADAPTERS"]}
+        },
+        "scratch_requires_specialized_exhaustion": {"const": true},
+        "require_catalog_hint_accounting": {"const": true}
+      },
+      "additionalProperties": false
+    },
+    "recovery": {
+      "type": "object",
+      "required": ["max_retries", "escalate_non_retryable_immediately"],
+      "properties": {
+        "max_retries": {"const": 3},
+        "escalate_non_retryable_immediately": {"const": true}
+      },
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["required_for_publication"],
+      "properties": {"required_for_publication": {"type": "boolean"}},
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

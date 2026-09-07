@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "families": [
+    {
+      "intent": "tree_generation",
+      "hints": [
+        {"method_id": "tree_generator.extension", "label": "Installed tree-generator extension", "source": "EXTENSION"},
+        {"method_id": "tree_generator.node_tool", "label": "Reusable tree Geometry Nodes / Node Tool", "source": "GEOMETRY_NODE_TOOL"},
+        {"method_id": "tree_generator.asset_library", "label": "Reusable tree asset or generator", "source": "ASSET_LIBRARY"}
+      ]
+    },
+    {
+      "intent": "symmetry",
+      "hints": [
+        {"method_id": "modifier.mirror", "label": "Mirror modifier", "source": "BLENDER_NATIVE"}
+      ]
+    },
+    {
+      "intent": "repetition",
+      "hints": [
+        {"method_id": "modifier.array", "label": "Array modifier", "source": "BLENDER_NATIVE"},
+        {"method_id": "geometry_nodes.array", "label": "Geometry Nodes Array", "source": "BLENDER_NATIVE"}
+      ]
+    },
+    {
+      "intent": "surface_scatter",
+      "hints": [
+        {"method_id": "geometry_nodes.scatter_on_surface", "label": "Geometry Nodes Scatter on Surface", "source": "BLENDER_NATIVE"}
+      ]
+    },
+    {
+      "intent": "thickness",
+      "hints": [
+        {"method_id": "modifier.solidify", "label": "Solidify modifier", "source": "BLENDER_NATIVE"}
+      ]
+    },
+    {
+      "intent": "lathe_revolve",
+      "hints": [
+        {"method_id": "modifier.screw", "label": "Screw modifier", "source": "BLENDER_NATIVE"}
+      ]
+    },
+    {
+      "intent": "edge_rounding",
+      "hints": [
+        {"method_id": "modifier.bevel", "label": "Bevel modifier", "source": "BLENDER_NATIVE"}
+      ]
+    },
+    {
+      "intent": "hair_generation",
+      "hints": [
+        {"method_id": "geometry_nodes.hair", "label": "Geometry Nodes hair tools", "source": "BLENDER_NATIVE"},
+        {"method_id": "hair.node_tool", "label": "Reusable hair Node Tool", "source": "GEOMETRY_NODE_TOOL"}
+      ]
+    }
+  ]
+}

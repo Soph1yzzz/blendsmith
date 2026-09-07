@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blendsmith.dev/schemas/capability_report.schema.json",
+  "type": "object",
+  "required": ["schema_version", "captured_at", "capabilities"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "captured_at": {"type": "string", "format": "date-time"},
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["status"],
+        "properties": {
+          "status": {"enum": ["AVAILABLE", "UNAVAILABLE", "BROKEN", "UNKNOWN"]},
+          "details": {"type": "object"},
+          "observed_at": {"type": ["string", "null"], "format": "date-time"}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

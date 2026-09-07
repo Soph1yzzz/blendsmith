@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blendsmith.dev/schemas/method_selection.schema.json",
+  "$defs": {
+    "source_status": {"enum": ["CHECKED", "UNAVAILABLE", "BROKEN", "UNKNOWN"]},
+    "availability": {"enum": ["AVAILABLE", "UNAVAILABLE", "BROKEN", "UNKNOWN"]},
+    "fit": {"enum": ["FULL", "PARTIAL_LOCAL_REFINEMENT", "INSUFFICIENT", "UNKNOWN"]},
+    "kind": {"enum": ["SPECIALIZED", "GENERAL_PURPOSE", "SCRATCH"]},
+    "source": {"enum": ["BLENDER_NATIVE", "GEOMETRY_NODE_TOOL", "ASSET_LIBRARY", "EXTENSION", "PROJECT_CATALOG", "ADAPTER", "CUSTOM"]},
+    "discovery_source": {
+      "type": "object",
+      "required": ["source", "status", "evidence"],
+      "properties": {
+        "source": {"enum": ["BLENDER_NATIVE", "GEOMETRY_NODE_TOOLS", "ASSET_LIBRARIES", "EXTENSIONS", "PROJECT_CATALOG", "ADAPTERS"]},
+        "status": {"$ref": "#/$defs/source_status"},
+        "evidence": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+      },
+      "additionalProperties": false
+    },
+    "method": {
+      "type": "object",
+      "required": ["method_id", "label", "kind", "source", "availability", "requirement_fit", "probe_evidence", "limitations"],
+      "properties": {
+        "method_id": {"type": "string", "minLength": 1, "maxLength": 256},
+        "label": {"type": "string", "minLength": 1, "maxLength": 256},
+        "kind": {"$ref": "#/$defs/kind"},
+        "source": {"$ref": "#/$defs/source"},
+        "availability": {"$ref": "#/$defs/availability"},
+        "requirement_fit": {"$ref": "#/$defs/fit"},
+        "probe_evidence": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "limitations": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+      },
+      "additionalProperties": false
+    },
+    "selection": {
+      "type": "object",
+      "required": ["work_unit_id", "specialized_search_complete", "candidate_methods", "selected_method_id", "selection_reason", "remaining_manual_work"],
+      "properties": {
+        "work_unit_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "specialized_search_complete": {"const": true},
+        "candidate_methods": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/method"}},
+        "selected_method_id": {"type": "string", "minLength": 1, "maxLength": 256},
+        "selection_reason": {"type": "string", "minLength": 1},
+        "remaining_manual_work": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": ["schema_version", "run_id", "plan_id", "plan_sha256", "selection_round", "discovery_sources", "selections"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "plan_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "plan_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "selection_round": {"type": "integer", "minimum": 0},
+    "discovery_sources": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/discovery_source"}},
+    "selections": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/selection"}}
+  },
+  "additionalProperties": false
+}

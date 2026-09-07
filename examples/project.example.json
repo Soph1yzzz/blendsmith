@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "project_id": "example_project",
+  "storage": {
+    "ephemeral_ttl_hours": 24
+  },
+  "qa": {
+    "live_gui_review": "required_if_capable",
+    "max_primary_repair_issues": 2,
+    "max_variants_per_iteration": 3,
+    "minimum_render_width": 1600,
+    "minimum_render_height": 900,
+    "review_max_edge": 1920,
+    "tile_size": 896,
+    "tile_overlap": 96,
+    "jpeg_quality": 92,
+    "required_evidence": ["front", "three_quarter"],
+    "required_perspectives": ["structure", "surface"]
+  },
+  "method_selection": {
+    "required": true,
+    "required_discovery_sources": [
+      "BLENDER_NATIVE",
+      "GEOMETRY_NODE_TOOLS",
+      "ASSET_LIBRARIES",
+      "EXTENSIONS",
+      "PROJECT_CATALOG",
+      "ADAPTERS"
+    ],
+    "scratch_requires_specialized_exhaustion": true,
+    "require_catalog_hint_accounting": true
+  },
+  "recovery": {
+    "max_retries": 3,
+    "escalate_non_retryable_immediately": true
+  },
+  "provenance": {
+    "required_for_publication": false
+  }
+}

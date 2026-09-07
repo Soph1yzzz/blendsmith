@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "run_id": "run-example",
+  "plan_id": "plan-environment-01",
+  "plan_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "selection_round": 0,
+  "discovery_sources": [
+    {"source": "BLENDER_NATIVE", "status": "CHECKED", "evidence": ["Blender 5.2 native tool/modifier inventory inspected"]},
+    {"source": "GEOMETRY_NODE_TOOLS", "status": "CHECKED", "evidence": ["Available Node Tools inspected"]},
+    {"source": "ASSET_LIBRARIES", "status": "CHECKED", "evidence": ["Configured asset libraries inspected"]},
+    {"source": "EXTENSIONS", "status": "CHECKED", "evidence": ["Installed Blender extensions inspected"]},
+    {"source": "PROJECT_CATALOG", "status": "CHECKED", "evidence": ["Project-local reusable methods inspected"]},
+    {"source": "ADAPTERS", "status": "CHECKED", "evidence": ["Configured production adapters inspected"]}
+  ],
+  "selections": [
+    {
+      "work_unit_id": "tree-01",
+      "specialized_search_complete": true,
+      "candidate_methods": [
+        {
+          "method_id": "tree.generator.installed",
+          "label": "Installed procedural tree generator",
+          "kind": "SPECIALIZED",
+          "source": "EXTENSION",
+          "availability": "AVAILABLE",
+          "requirement_fit": "PARTIAL_LOCAL_REFINEMENT",
+          "probe_evidence": ["Generator was found and a compatible tree-generation operation is available"],
+          "limitations": ["Final silhouette and damage details require local refinement"]
+        },
+        {
+          "method_id": "scratch.tree_mesh",
+          "label": "Manual tree mesh construction",
+          "kind": "SCRATCH",
+          "source": "CUSTOM",
+          "availability": "AVAILABLE",
+          "requirement_fit": "FULL",
+          "probe_evidence": ["General mesh construction is available"],
+          "limitations": ["Reimplements branching that the specialized generator already provides"]
+        }
+      ],
+      "selected_method_id": "tree.generator.installed",
+      "selection_reason": "A dedicated available generator provides the base structure; only bounded local refinement remains.",
+      "remaining_manual_work": ["adjust silhouette", "add requested damage/detail"]
+    }
+  ]
+}

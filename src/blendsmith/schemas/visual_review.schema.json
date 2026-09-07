@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blendsmith.dev/schemas/visual_review.schema.json",
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "issue": {
+      "type": "object",
+      "required": ["issue_id", "severity", "category", "view_keys", "observation", "likely_cause", "recommended_strategy", "regression_risk", "acceptance_test"],
+      "properties": {
+        "issue_id": {"type": "string", "minLength": 1},
+        "severity": {"enum": ["critical", "high", "medium", "low", "info"]},
+        "category": {"type": "string", "minLength": 1},
+        "view_keys": {"type": "array", "items": {"type": "string"}, "minItems": 1, "uniqueItems": true},
+        "observation": {"type": "string", "minLength": 1},
+        "likely_cause": {"type": "string", "minLength": 1},
+        "recommended_strategy": {"type": "string", "minLength": 1},
+        "regression_risk": {"type": "string", "minLength": 1},
+        "acceptance_test": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "regression": {
+      "type": "object",
+      "required": ["severity", "description"],
+      "properties": {
+        "severity": {"enum": ["major", "minor", "none"]},
+        "description": {"type": "string"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": ["schema_version", "run_id", "candidate_id", "candidate_sha256", "verdict", "opened_evidence", "issues", "regressions", "uncertainties", "next_action"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "candidate_id": {"type": "string", "minLength": 1},
+    "candidate_sha256": {"$ref": "#/$defs/sha256"},
+    "verdict": {"enum": ["ACCEPT", "REVISE", "BLOCKED"]},
+    "revision_strategy": {"enum": ["LOCAL_REPAIR", "METHOD_RECONSIDERATION"]},
+    "opened_evidence": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "perspectives_completed": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "issues": {"type": "array", "items": {"$ref": "#/$defs/issue"}},
+    "regressions": {"type": "array", "items": {"$ref": "#/$defs/regression"}},
+    "uncertainties": {"type": "array", "items": {"type": "string"}},
+    "next_action": {"type": "string", "minLength": 1}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"verdict": {"const": "REVISE"}}},
+      "then": {"required": ["revision_strategy"]}
+    }
+  ],
+  "additionalProperties": false
+}

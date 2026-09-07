@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blendsmith.dev/schemas/candidate_manifest.schema.json",
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "file": {
+      "type": "object",
+      "required": ["role", "source_path", "pinned_path", "sha256", "size"],
+      "properties": {
+        "role": {"enum": ["candidate", "dependency"]},
+        "source_path": {"type": "string", "minLength": 1},
+        "pinned_path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "size": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": ["schema_version", "run_id", "candidate_id", "iteration", "variant_index", "method_plan_id", "method_selection_round", "method_selection_sha256", "candidate_sha256", "closure_sha256", "files", "created_at"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "candidate_id": {"type": "string", "minLength": 1},
+    "iteration": {"type": "integer", "minimum": 0},
+    "variant_index": {"type": "integer", "minimum": 1, "maximum": 3},
+    "method_plan_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "method_selection_round": {"type": "integer", "minimum": 0},
+    "method_selection_sha256": {"$ref": "#/$defs/sha256"},
+    "candidate_sha256": {"$ref": "#/$defs/sha256"},
+    "closure_sha256": {"$ref": "#/$defs/sha256"},
+    "files": {"type": "array", "items": {"$ref": "#/$defs/file"}, "minItems": 1},
+    "created_at": {"type": "string", "format": "date-time"}
+  },
+  "additionalProperties": false
+}

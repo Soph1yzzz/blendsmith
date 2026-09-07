@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blendsmith.dev/schemas/checkpoint.schema.json",
+  "$defs": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+  "type": "object",
+  "required": ["schema_version", "checkpoint_id", "run_id", "created_at", "resume_state", "iteration", "method_selection_round", "candidate_id", "candidate_sha256", "closure_sha256", "candidate_manifest_path", "method_plan_snapshot_path", "method_plan_sha256", "method_selection_snapshot_path", "method_selection_sha256", "next_action"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "checkpoint_id": {"type": "string", "minLength": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "created_at": {"type": "string", "format": "date-time"},
+    "resume_state": {"type": "string", "minLength": 1},
+    "iteration": {"type": "integer", "minimum": 0},
+    "method_selection_round": {"type": "integer", "minimum": 0},
+    "candidate_id": {"type": ["string", "null"], "minLength": 1},
+    "candidate_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+    "closure_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+    "candidate_manifest_path": {"type": ["string", "null"], "minLength": 1},
+    "method_plan_snapshot_path": {"type": ["string", "null"], "minLength": 1},
+    "method_plan_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+    "method_selection_snapshot_path": {"type": ["string", "null"], "minLength": 1},
+    "method_selection_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+    "review_path": {"type": ["string", "null"]},
+    "fix_plan_path": {"type": ["string", "null"]},
+    "unresolved_issue_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "next_action": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

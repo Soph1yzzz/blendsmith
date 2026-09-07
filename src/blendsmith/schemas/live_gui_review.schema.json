@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blendsmith.dev/schemas/live_gui_review.schema.json",
+  "$defs": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+  "type": "object",
+  "required": ["schema_version", "run_id", "candidate_id", "candidate_sha256", "status", "capability_status", "blend_path_verified", "dirty_state_checked", "viewport_interaction_performed", "views_observed", "issues"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "candidate_id": {"type": "string", "minLength": 1},
+    "candidate_sha256": {"$ref": "#/$defs/sha256"},
+    "status": {"enum": ["PASS", "REVISE", "BLOCKED", "SKIPPED_UNAVAILABLE"]},
+    "capability_status": {"enum": ["AVAILABLE", "UNAVAILABLE", "BROKEN", "UNKNOWN"]},
+    "blend_path_verified": {"type": "boolean"},
+    "dirty_state_checked": {"type": "boolean"},
+    "viewport_interaction_performed": {"type": "boolean"},
+    "views_observed": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["description", "blocking"],
+        "properties": {
+          "description": {"type": "string", "minLength": 1},
+          "blocking": {"type": "boolean"}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "PASS"}}, "required": ["status"]},
+      "then": {
+        "properties": {
+          "capability_status": {"const": "AVAILABLE"},
+          "blend_path_verified": {"const": true},
+          "dirty_state_checked": {"const": true},
+          "viewport_interaction_performed": {"const": true},
+          "views_observed": {"minItems": 1}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"status": {"const": "SKIPPED_UNAVAILABLE"}}, "required": ["status"]},
+      "then": {"properties": {"capability_status": {"const": "UNAVAILABLE"}}}
+    }
+  ],
+  "additionalProperties": false
+}
