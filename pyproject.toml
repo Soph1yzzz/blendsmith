@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "blendsmith"
 version = "0.0.1"
-description = "Production harness for AI-assisted Blender: method selection, visual QA, repair, checkpoints, and human approval"
+description = "Production loop harness for AI-assisted Blender: method selection, visual QA, repair, checkpoints, and human approval"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
@@ -16,6 +16,7 @@ keywords = [
   "automation",
   "codex",
   "agentic-workflow",
+  "loop-harness",
   "visual-review",
 ]
 dependencies = [

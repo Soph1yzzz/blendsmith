@@ -1,20 +1,32 @@
-<div align="center">
+<p align="center">
+  <img src="docs/assets/blendsmith-readme-hero.png" alt="BlendSmith — a production loop harness for AI-assisted Blender" width="100%">
+</p>
 
-# BlendSmith
+<h1 align="center">BlendSmith</h1>
 
-### A production harness for AI-assisted Blender
+<p align="center"><strong>A production loop harness for AI-assisted Blender.</strong></p>
+<p align="center">Choose better methods. Inspect real evidence. Repair deliberately. Stop at human approval.</p>
 
-**Choose better methods. Inspect real evidence. Repair deliberately. Stop at human approval.**
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white" alt="Python 3.11+">
+  <img src="https://img.shields.io/badge/Blender-5.2%20LTS-F5792A?logo=blender&logoColor=white" alt="Blender 5.2 LTS">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-4C8BF5.svg" alt="Apache-2.0"></a>
+</p>
 
-[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](pyproject.toml)
-[![Blender 5.2 LTS](https://img.shields.io/badge/Blender-5.2%20LTS-F5792A?logo=blender&logoColor=white)](https://www.blender.org/)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-4C8BF5.svg)](LICENSE)
+<p align="center">
+  <strong><a href="#quickstart-with-codex">Quickstart</a></strong> ·
+  <strong><a href="#what-can-this-workflow-produce">Examples</a></strong> ·
+  <strong><a href="#the-production-loop">Loop</a></strong> ·
+  <strong><a href="#specialized-first-scratch-last">Method selection</a></strong> ·
+  <strong><a href="docs/SECURITY.md">Security</a></strong> ·
+  <strong><a href="docs/SPECIFICATION.md">Specification</a></strong>
+</p>
 
-</div>
+BlendSmith is a **model-independent loop harness for Blender agents**. It does not replace the model, Blender, MCP, `bpy`, or GUI automation. It wraps them in a production loop that manages **method planning, method selection, candidate evidence, visual review, repair or method reselection, checkpointing, exact human approval, retention, and verified publication**.
 
-BlendSmith is a model-independent orchestration harness for Blender agents. It does not replace the model, Blender, MCP, `bpy`, or GUI automation. It manages the production process around them: **method selection, evidence, visual review, repair, checkpointing, exact human approval, retention, and verified publication**.
+The point is not to make an incapable model look capable. The point is to make capable models operate inside a repeatable control loop instead of treating each Blender task as a one-shot improvisation.
 
-> Modern models can already build impressive 3D assets. BlendSmith exists because **being able to build something is not the same as consistently choosing the right Blender method, inspecting the result, recovering safely, and handing an exact reviewed artifact to a human.**
+> With the arrival of **GPT-6 Astra**, modern models can already build impressive 3D assets. BlendSmith exists because **being able to build something is not the same as consistently choosing the right Blender method, inspecting the result, recovering safely, iterating deliberately, and handing an exact reviewed artifact to a human.**
 
 ## What can this workflow produce?
 
@@ -35,34 +47,37 @@ The private Blender harness that evolved into BlendSmith was already producing w
   </tr>
 </table>
 
-BlendSmith is the public, model-neutral harness distilled from that production workflow. Output quality still depends on the model, references, available Blender capabilities, and iteration; BlendSmith governs the process rather than pretending to be the artist itself.
+BlendSmith is the public, model-neutral harness distilled from that production workflow. Output quality still depends on the model, references, available Blender capabilities, and iteration. BlendSmith governs the **loop around production** rather than pretending to be the artist itself.
 
 ### Current-generation dogfood
 
-BlendSmith was also tested internally with **Astra** on an ornate sword task. The model independently revised an earlier candidate, while BlendSmith still provided useful production discipline: method discovery, exact candidate pinning, multi-view evidence, live-GUI verification, and a hard stop at `OWNER_REVIEW`. The render is intentionally not included here; this is an orchestration claim, not a model benchmark.
+A light internal dogfood run with **GPT-6 Astra** on an ornate sword task also found the harness useful. The model could already produce the asset and revise an earlier candidate on its own, while BlendSmith still added useful production discipline through method discovery, exact candidate pinning, six-view evidence, live-GUI verification, and a hard stop at `OWNER_REVIEW`.
 
-## The idea in one diagram
+<p align="center">
+  <img src="docs/assets/blendsmith-astra-dogfood.png" alt="BlendSmith GPT-6 Astra dogfood proof panel" width="100%">
+</p>
 
-```mermaid
-flowchart TD
-    A[Request] --> B[Method Plan]
-    B --> C{Best available method?}
-    C -->|Dedicated| D[Specialized production]
-    C -->|No viable dedicated method| E[Bounded fallback]
-    D --> F[Candidate]
-    E --> F
-    F --> G[Multi-view evidence]
-    G --> H{Visual review}
-    H -->|Local defect| I[Targeted repair]
-    I --> F
-    H -->|Wrong method| C
-    H -->|Accept| J[Live GUI check when available]
-    J --> K[AI_ACCEPTED]
-    K --> L[OWNER_REVIEW]
-    L -->|Explicit exact-SHA accept| M[Human accepted final]
+## The production loop
+
+Open-ended AI 3D work becomes more reliable when creation, inspection, correction, and authority are part of the same explicit loop.
+
+<p align="center">
+  <img src="docs/assets/blendsmith-control-loop.png" alt="BlendSmith production control loop" width="100%">
+</p>
+
+A review does not merely answer “good or bad.” It decides what kind of next move is justified:
+
+- **Local repair** — the method is sound; fix a bounded defect and re-enter production.
+- **Method reselection** — the approach itself is wrong; return to method selection instead of hand-patching forever.
+- **AI acceptance** — machine-side gates passed; advance to the human authority boundary.
+
+That review-and-repair loop ends deliberately at:
+
+```text
+AI_ACCEPTED != HUMAN_ACCEPTED
 ```
 
-**The agent can propose progress. BlendSmith Core decides whether that progress is valid. The owner decides whether the exact reviewed artifact is accepted.**
+The agent can propose progress. BlendSmith Core decides whether that progress is valid. The owner decides whether the exact reviewed artifact is accepted.
 
 ## Why BlendSmith?
 
@@ -70,16 +85,24 @@ flowchart TD
 | --- | --- |
 | The model knows a Blender feature exists, but forgets to use it | **Method Selection Gate** — specialized methods are evaluated before production |
 | A candidate exists, so the agent declares success | **Evidence-backed review** — actual views must be opened and evaluated |
-| Endless hand-tweaking after choosing the wrong approach | **Method reconsideration** — route back to method selection instead of patching forever |
+| Endless hand-tweaking after choosing the wrong approach | **Method reconsideration** — loop back to method selection instead of patching forever |
 | The agent says “looks good” | **AI acceptance is separate from human acceptance** |
 | A file changes after review | **SHA-bound authority** — approval names the exact reviewed bytes |
 | GUI capability breaks | **No silent downgrade** — `BROKEN` / `UNKNOWN` cannot be disguised as `UNAVAILABLE` |
-| A long run is interrupted | **Checkpoint / resume** — restore validated authority state rather than improvising from memory |
+| A long run is interrupted | **Checkpoint / resume** — restore validated loop authority rather than improvising from memory |
 | Old heavy artifacts accumulate forever | **TTL + verified GC** — only eligible managed data can be cleaned up |
+
+BlendSmith does not promise that every loop ends in success. It makes the outcome explicit: continue through a valid repair/reselection path, escalate an unresolved condition, or stop at the owner boundary with inspectable evidence.
 
 ## Specialized first, scratch last
 
 Knowing that Blender has `Mirror`, `Array`, Geometry Nodes, asset libraries, extensions, or reusable node tools is not the same as selecting them at the right time.
+
+The production loop therefore starts with method discipline rather than immediate construction.
+
+<p align="center">
+  <img src="docs/assets/blendsmith-method-selection.png" alt="BlendSmith specialized-first method selection" width="100%">
+</p>
 
 Before production, BlendSmith requires work-unit planning and a machine-validated method-selection receipt. The default discovery policy accounts for:
 
@@ -142,11 +165,11 @@ or:
 Use BlendSmith to build this in Blender.
 ```
 
-The Skill is intentionally thin. It does not duplicate BlendSmith's state machine in prompt text; it queries the installed CLI/Core through `doctor`, `status`, command help, and authoritative JSON schemas.
+The Skill is intentionally thin. It does not duplicate BlendSmith's lifecycle in prompt text; it queries the installed CLI/Core through `doctor`, `status`, command help, and authoritative JSON schemas. The Core remains the source of truth for every loop transition.
 
 ## What happens after invocation?
 
-A typical run looks like this:
+A typical production loop looks like this:
 
 ```text
 preflight
@@ -156,8 +179,8 @@ preflight
   -> candidate pin
   -> multi-view evidence
   -> visual review
-       -> local repair, or
-       -> method reconsideration
+       -> local repair -> production, or
+       -> method reconsideration -> method selection
   -> live GUI review when available
   -> AI_ACCEPTED
   -> OWNER_REVIEW
@@ -165,11 +188,13 @@ preflight
 
 At `OWNER_REVIEW`, automatic progress stops.
 
-```text
-AI_ACCEPTED != HUMAN_ACCEPTED
-```
-
 Human acceptance is bound to the exact candidate SHA-256 that was reviewed. BlendSmith does not infer approval from silence, an AI verdict, or a previous version of the file.
+
+## Checkpoint and resume
+
+Long-running Blender work should not depend on the model remembering the previous chat perfectly. BlendSmith checkpoints preserve the authority needed to resume the control loop safely: validated method receipts, selection round, candidate closure, and integrity bindings.
+
+A resume revalidates those bindings instead of turning stale conversational memory into authority.
 
 ## Use the Core directly
 
@@ -215,10 +240,12 @@ The CLI rejects unauthorized transitions instead of relying on the agent to reme
 
 ## Core guarantees
 
+- **Loop authority lives in Core.** The agent proposes actions; the deterministic Core validates state transitions.
 - **Specialized first, scratch last.** Viable dedicated methods take precedence over generic construction.
 - **Exact method authority.** Candidate manifests bind the exact Method Selection SHA, which binds the exact Method Plan SHA.
 - **Validated receipts are immutable.** Editing an accepted plan or selection behind the lifecycle causes an integrity failure.
 - **Evidence is real input to review.** Visual acceptance requires opened evidence; file existence alone is not visual review.
+- **Repair and reselection are different loop paths.** A local defect does not automatically justify keeping a bad production method.
 - **Live GUI verification is concrete.** A GUI `PASS` requires path, dirty-state, interaction, and observed-view evidence.
 - **Human authority is explicit and SHA-bound.** Only the owner can accept the exact reviewed candidate.
 - **Retries are bounded.** Retry-safe operations get an initial attempt plus at most three retries; unsafe ambiguity escalates.
@@ -263,7 +290,7 @@ CI covers Python 3.11 / 3.12 on Windows and Ubuntu.
 
 ## Status
 
-**v0.0.1** is the first public release target. It includes the model-neutral Core/CLI, Method Selection Gate, evidence and visual-review contracts, bounded repair, live-GUI verification, owner authority, checkpoint/resume, retention/GC, verified local publication, and the bundled Codex Skill.
+**v0.0.1** is the first public release target. It includes the model-neutral Core/CLI, production-loop state machine, Method Selection Gate, evidence and visual-review contracts, bounded repair, method reconsideration, live-GUI verification, owner authority, checkpoint/resume, retention/GC, verified local publication, and the bundled Codex Skill.
 
 ## License
 
