@@ -6,7 +6,6 @@
 
 **Choose better methods. Inspect real evidence. Repair deliberately. Stop at human approval.**
 
-[![CI](https://github.com/Soph1yzzz/blendsmith/actions/workflows/ci.yml/badge.svg)](https://github.com/Soph1yzzz/blendsmith/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](pyproject.toml)
 [![Blender 5.2 LTS](https://img.shields.io/badge/Blender-5.2%20LTS-F5792A?logo=blender&logoColor=white)](https://www.blender.org/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-4C8BF5.svg)](LICENSE)
@@ -45,10 +44,10 @@ BlendSmith was also tested internally with **Astra** on an ornate sword task. Th
 ## The idea in one diagram
 
 ```mermaid
-flowchart LR
+flowchart TD
     A[Request] --> B[Method Plan]
     B --> C{Best available method?}
-    C -->|Dedicated method| D[Specialized production]
+    C -->|Dedicated| D[Specialized production]
     C -->|No viable dedicated method| E[Bounded fallback]
     D --> F[Candidate]
     E --> F
