@@ -16,6 +16,7 @@
 </p>
 
 <p align="center">
+  <strong><a href="README.ja.md">日本語 README</a></strong> ·
   <strong><a href="#quickstart-with-codex">Quickstart</a></strong> ·
   <strong><a href="#what-can-this-workflow-produce">Examples</a></strong> ·
   <strong><a href="#the-production-loop">Loop</a></strong> ·
@@ -32,7 +33,7 @@ The point is not to make an incapable model look capable. The point is to make c
 
 ## What can this workflow produce?
 
-The private Blender harness that evolved into BlendSmith was already producing work like this with **GPT-5.6 Sol High**. These are real outputs from that workflow, not mockups.
+The private Blender harness that evolved into BlendSmith was already producing work like this with **GPT-5.6 Sol High**.
 
 <p align="center">
   <img src="assets/examples/gothic-interior.png" alt="AI-assisted Gothic interior created in Blender" width="100%">
@@ -277,6 +278,7 @@ The CLI rejects unauthorized transitions instead of relying on the agent to reme
 - [Method Selection Gate](docs/METHOD_SELECTION.md)
 - [Security model](docs/SECURITY.md)
 - [Contracts](docs/CONTRACTS.md)
+- [Roadmap](docs/ROADMAP.md)
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
 
@@ -293,6 +295,8 @@ CI covers Python 3.11 / 3.12 on Windows and Ubuntu.
 ## Status
 
 **v0.0.1** is the first public release. It includes the model-neutral Core/CLI, production-loop state machine, Method Selection Gate, evidence and visual-review contracts, bounded repair, method reconsideration, live-GUI verification, owner authority, checkpoint/resume, retention/GC, verified local publication, and the bundled Codex Skill.
+
+Next: **v0.0.2 — Production Structure**, focused on decomposition, dependency-aware production graphs, construction sequence, structural integrity, safer recovery, and agent-facing introspection. See the [roadmap](docs/ROADMAP.md).
 
 ## License
 
