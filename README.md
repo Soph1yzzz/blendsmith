@@ -8,6 +8,8 @@
 <p align="center">Choose better methods. Inspect real evidence. Repair deliberately. Stop at human approval.</p>
 
 <p align="center">
+  <a href="https://github.com/Soph1yzzz/blendsmith/releases/latest"><img src="https://img.shields.io/github/v/release/Soph1yzzz/blendsmith?style=flat-square&label=release" alt="Latest release"></a>
+  <a href="https://github.com/Soph1yzzz/blendsmith/actions/workflows/ci.yml"><img src="https://github.com/Soph1yzzz/blendsmith/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white" alt="Python 3.11+">
   <img src="https://img.shields.io/badge/Blender-5.2%20LTS-F5792A?logo=blender&logoColor=white" alt="Blender 5.2 LTS">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-4C8BF5.svg" alt="Apache-2.0"></a>
@@ -290,7 +292,7 @@ CI covers Python 3.11 / 3.12 on Windows and Ubuntu.
 
 ## Status
 
-**v0.0.1** is the first public release target. It includes the model-neutral Core/CLI, production-loop state machine, Method Selection Gate, evidence and visual-review contracts, bounded repair, method reconsideration, live-GUI verification, owner authority, checkpoint/resume, retention/GC, verified local publication, and the bundled Codex Skill.
+**v0.0.1** is the first public release. It includes the model-neutral Core/CLI, production-loop state machine, Method Selection Gate, evidence and visual-review contracts, bounded repair, method reconsideration, live-GUI verification, owner authority, checkpoint/resume, retention/GC, verified local publication, and the bundled Codex Skill.
 
 ## License
 

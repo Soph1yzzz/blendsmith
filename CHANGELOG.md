@@ -2,7 +2,7 @@
 
 ## 0.0.1
 
-Initial public release target.
+Initial public release.
 
 - Model-neutral BlendSmith CLI/Core.
 - Blender 5.2 LTS runtime probing.
