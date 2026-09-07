@@ -7,8 +7,9 @@ import pytest
 
 from blendsmith.checkpoint import verify_checkpoint
 from blendsmith.closure import verify_candidate_manifest
-from blendsmith.errors import AuthorityError, ContractError, IntegrityError, SafetyError
+from blendsmith.errors import AuthorityError, CapabilityError, ContractError, IntegrityError, SafetyError
 from blendsmith.hashing import sha256_file
+from blendsmith.methods import load_method_hints
 from blendsmith.orchestrator import BlendSmith
 from blendsmith.paths import atomic_write_json
 from blendsmith.publication import publish_verified
@@ -16,15 +17,25 @@ from blendsmith.run_store import load_current_run, save_run, transition
 from blendsmith.state_machine import RunState
 
 
-def _capabilities(app: BlendSmith, gui: str) -> None:
+def _capabilities(
+    app: BlendSmith,
+    gui: str,
+    *,
+    captured_at: str = "2026-09-06T00:00:00Z",
+    explicit_gui_probe: bool = True,
+) -> None:
     payload = {
         "schema_version": 1,
-        "captured_at": "2026-09-06T00:00:00Z",
+        "captured_at": captured_at,
         "capabilities": {
-            "filesystem": {"status": "AVAILABLE", "details": {}, "observed_at": "2026-09-06T00:00:00Z"},
-            "blender_backend": {"status": "AVAILABLE", "details": {}, "observed_at": "2026-09-06T00:00:00Z"},
-            "render_image_review": {"status": "AVAILABLE", "details": {}, "observed_at": "2026-09-06T00:00:00Z"},
-            "live_blender_gui_review": {"status": gui, "details": {}, "observed_at": "2026-09-06T00:00:00Z"},
+            "filesystem": {"status": "AVAILABLE", "details": {}, "observed_at": captured_at},
+            "blender_backend": {"status": "AVAILABLE", "details": {}, "observed_at": captured_at},
+            "render_image_review": {"status": "AVAILABLE", "details": {}, "observed_at": captured_at},
+            "live_blender_gui_review": {
+                "status": gui,
+                "details": {"source": "explicit" if explicit_gui_probe else "not_probed"},
+                "observed_at": captured_at if explicit_gui_probe else None,
+            },
         },
     }
     atomic_write_json(app.layout.capabilities / "0001.json", payload)
@@ -64,17 +75,43 @@ def _discovery_sources(*, extensions: str = "CHECKED") -> list[dict]:
     ]
 
 
+def _family_checks(*applicable: str) -> list[dict]:
+    applicable_set = set(applicable)
+    return [
+        {
+            "intent": family["intent"],
+            "status": "APPLICABLE" if family["intent"] in applicable_set else "NOT_APPLICABLE",
+            "evidence": [f"decomposition:{family['intent']}"],
+        }
+        for family in load_method_hints()["families"]
+    ]
+
+
 def _method_plan(app: BlendSmith, *, plan_id: str = "plan-main") -> dict:
     run = app.status()
     return {
         "schema_version": 1,
         "run_id": run["run_id"],
         "plan_id": plan_id,
+        "revision": int(run["metadata"].get("method_plan_revision", 0)),
+        "supersedes_sha256": run["metadata"].get("previous_method_plan_sha256"),
+        "revision_reason": run["metadata"].get("pending_plan_revision_reason"),
         "work_units": [
             {
                 "work_unit_id": "primary-shape",
-                "intent": "symmetry",
+                "intent": "primary shape",
                 "requirements": ["editable", "repeatable"],
+                "rationale": "Primary symmetric shape is an independent production unit.",
+                "stage": "geometry",
+                "depends_on": [],
+                "method_family_checks": _family_checks("symmetry"),
+                "method_operations": [
+                    {
+                        "operation_id": "primary-shape.symmetry",
+                        "intent": "symmetry",
+                        "requirements": ["editable", "repeatable"],
+                    }
+                ],
             }
         ],
     }
@@ -93,6 +130,7 @@ def _specialized_selection(app: BlendSmith, *, round_id: int = 0) -> dict:
         "selections": [
             {
                 "work_unit_id": "primary-shape",
+                "operation_id": "primary-shape.symmetry",
                 "specialized_search_complete": True,
                 "candidate_methods": [
                     {
@@ -162,29 +200,63 @@ def _reach_owner_review(app: BlendSmith) -> str:
     return review["candidate_sha256"]
 
 
-def _revision_visual_payload(app: BlendSmith, strategy: str) -> dict:
+def _revision_visual_payload(app: BlendSmith) -> dict:
     payload = _accepted_visual_payload(app)
     payload["verdict"] = "REVISE"
-    payload["revision_strategy"] = strategy
     payload["issues"] = [
         {
             "issue_id": "shape-1",
             "severity": "medium",
-            "category": "method" if strategy == "METHOD_RECONSIDERATION" else "geometry",
+            "category": "geometry",
             "view_keys": ["front"],
-            "observation": "The current approach produces an artificial result.",
-            "likely_cause": "The selected production approach is not appropriate.",
-            "recommended_strategy": (
-                "Reconsider the method."
-                if strategy == "METHOD_RECONSIDERATION"
-                else "Refine locally."
-            ),
+            "observation": "The current result has a visible shape problem.",
+            "likely_cause": "The current production decision needs to be reassessed.",
+            "recommended_strategy": "Classify the change before choosing a repair depth.",
             "regression_risk": "low",
             "acceptance_test": "Result reads naturally after revision.",
         }
     ]
-    payload["next_action"] = "reselect method" if strategy == "METHOD_RECONSIDERATION" else "local repair"
+    payload["next_action"] = "classify change impact"
     return payload
+
+
+def _change_impact_payload(
+    app: BlendSmith,
+    scope: str,
+    *,
+    source: str = "VISUAL_REVIEW",
+    issue_ids: list[str] | None = None,
+    global_reassessment_recommended: bool = False,
+) -> dict:
+    run = app.status()
+    if issue_ids is None:
+        issue_ids = ["shape-1"]
+    return {
+        "schema_version": 1,
+        "run_id": run["run_id"],
+        "candidate_id": run["active_candidate_id"],
+        "candidate_sha256": verify_candidate_manifest(
+            app.layout.runs
+            / run["run_id"]
+            / run["metadata"]["candidate_manifest_path"]
+        )["candidate_sha256"],
+        "source": source,
+        "scope": scope,
+        "issue_ids": issue_ids,
+        "affected_work_units": ["primary-shape"],
+        "rationale": f"The requested change belongs at {scope.lower()} scope.",
+        "method_continuity": {
+            "status": "PRESERVE" if scope == "LOCAL" else "RESELECT",
+            "selected_method_ids": ["modifier.mirror"],
+            "evidence": ["The active method-selection receipt was inspected."],
+        },
+        "global_reassessment_recommended": global_reassessment_recommended,
+        "upstream_change_summary": (
+            "The upstream production structure must change."
+            if scope in {"STRUCTURAL", "CONTRACT"}
+            else None
+        ),
+    }
 
 
 def test_method_gate_waiting_state_can_checkpoint_without_candidate(
@@ -228,7 +300,9 @@ def test_visual_method_mismatch_reenters_method_selection(
     app = _start(tmp_path, monkeypatch)
     app.begin_evidence()
     app.submit_evidence({"front": Path("unused.png")})
-    app.submit_visual_review(_revision_visual_payload(app, "METHOD_RECONSIDERATION"))
+    app.submit_visual_review(_revision_visual_payload(app))
+    assert app.status()["state"] == "AWAITING_CHANGE_IMPACT"
+    app.submit_change_impact(_change_impact_payload(app, "METHOD"))
     run = app.status()
     assert run["state"] == "AWAITING_METHOD_SELECTION"
     assert run["iteration"] == 1
@@ -253,8 +327,10 @@ def test_local_repair_keeps_validated_method_selection(
     app = _start(tmp_path, monkeypatch)
     app.begin_evidence()
     app.submit_evidence({"front": Path("unused.png")})
-    review = _revision_visual_payload(app, "LOCAL_REPAIR")
+    review = _revision_visual_payload(app)
     app.submit_visual_review(review)
+    assert app.status()["state"] == "AWAITING_CHANGE_IMPACT"
+    app.submit_change_impact(_change_impact_payload(app, "LOCAL"))
     run = app.status()
     assert run["state"] == "AWAITING_FIX_PLAN"
     assert run["metadata"]["method_selection_round"] == 0
@@ -267,7 +343,8 @@ def test_local_repair_keeps_validated_method_selection(
             "candidate_id": review["candidate_id"],
             "candidate_sha256": review["candidate_sha256"],
             "primary_issue_ids": ["shape-1"],
-            "steps": ["Apply a bounded local geometry refinement."],
+            "method_ids_to_preserve": ["modifier.mirror"],
+            "steps": ["Apply a bounded local geometry refinement through the selected Mirror method."],
             "expected_acceptance_tests": ["The reported shape defect is resolved."],
         }
     )
@@ -314,14 +391,11 @@ def test_sha_bound_accept_publish_then_revision_transaction(tmp_path: Path, monk
     assert app.layout.publication_current.is_dir()
 
     run = app.owner_revise("adjust silhouette")
-    assert run["state"] == "WORKING"
+    assert run["state"] == "AWAITING_CHANGE_IMPACT"
     assert not app.layout.publication_current.exists()
     assert run["accepted_candidate_sha256"] is None
-
-    records = app.retention.records().values()
-    classes = {item["class"] for item in records}
-    assert "PINNED_ACTIVE_CHECKPOINT" in classes
-    assert "EPHEMERAL_SUPERSEDED_FINAL" in classes
+    assert run["metadata"]["change_impact_source"] == "OWNER_REVISION"
+    assert run["metadata"]["pending_owner_revision_issue_id"].startswith("owner-revision-i")
 
 
 def test_post_review_candidate_mutation_blocks_ai_accept(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -359,7 +433,13 @@ def test_live_gui_available_requires_strict_pass(tmp_path: Path, monkeypatch: py
         "blend_path_verified": False,
         "dirty_state_checked": True,
         "viewport_interaction_performed": True,
-        "views_observed": ["orbit"],
+        "exploration_actions": ["ORBIT", "ZOOM", "UNSEEN_ANGLE"],
+        "coverage": ["OVERALL_FORM", "THICKNESS_DEPTH", "HIDDEN_SURFACES"],
+        "views_observed": ["front orbit", "rear oblique", "underside closeup"],
+        "observations": [
+            "The silhouette remains coherent while orbiting.",
+            "No hidden attachment gap appears from the rear oblique view.",
+        ],
         "issues": [],
     }
     with pytest.raises(ContractError):
@@ -370,6 +450,110 @@ def test_live_gui_available_requires_strict_pass(tmp_path: Path, monkeypatch: py
     app.submit_gui_review(good)
     assert app.status()["state"] == "FINAL_AI_VALIDATION"
     assert app.status()["assurance_level"] == "live_gui_verified"
+
+
+def test_live_gui_revise_requires_real_interaction_and_bounds_quality_gain_issues(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = _start(tmp_path, monkeypatch, gui="AVAILABLE")
+    app.begin_evidence()
+    app.submit_evidence({"front": Path("unused.png")})
+    review = _accepted_visual_payload(app)
+    app.submit_visual_review(review)
+
+    issue = {
+        "issue_id": "gui-detail-1",
+        "category": "DETAIL_DEFICIT",
+        "severity": "medium",
+        "region": "pommel",
+        "observation": "The rear oblique view looks underdeveloped.",
+        "recommended_strategy": "Add one bounded detail layer.",
+        "blocking": False,
+        "quality_gain": "MEDIUM",
+    }
+    no_interaction = {
+        "schema_version": 1,
+        "run_id": review["run_id"],
+        "candidate_id": review["candidate_id"],
+        "candidate_sha256": review["candidate_sha256"],
+        "status": "REVISE",
+        "capability_status": "AVAILABLE",
+        "blend_path_verified": False,
+        "dirty_state_checked": False,
+        "viewport_interaction_performed": False,
+        "exploration_actions": [],
+        "coverage": [],
+        "views_observed": [],
+        "observations": [],
+        "issues": [issue],
+    }
+    with pytest.raises(ContractError):
+        app.submit_gui_review(no_interaction)
+
+    too_many = {
+        **no_interaction,
+        "blend_path_verified": True,
+        "dirty_state_checked": True,
+        "viewport_interaction_performed": True,
+        "exploration_actions": ["ORBIT", "ZOOM", "UNSEEN_ANGLE"],
+        "coverage": ["OVERALL_FORM", "DETAIL_DENSITY", "HIDDEN_SURFACES"],
+        "views_observed": ["front orbit", "rear oblique", "underside"],
+        "observations": ["Rear detail is sparse."],
+        "issues": [
+            {**issue, "issue_id": f"gui-detail-{index}", "region": f"region-{index}"}
+            for index in range(1, 4)
+        ],
+    }
+    with pytest.raises(ContractError, match="quality-gain issue budget"):
+        app.submit_gui_review(too_many)
+
+    valid = {**too_many, "issues": too_many["issues"][:2]}
+    app.submit_gui_review(valid)
+    assert app.status()["state"] == "AWAITING_CHANGE_IMPACT"
+
+
+def test_next_action_exposes_authoritative_candidate_path_and_next_command(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = _start(tmp_path, monkeypatch)
+    nxt = app.next_action()
+    assert nxt["state"] == "WORKING"
+    assert "evidence-begin" in nxt["next_command"]
+    assert Path(nxt["candidate_path"]).is_file()
+    assert len(nxt["candidate_sha256"]) == 64
+    assert nxt["method_plan_sha256"] == app.status()["metadata"]["method_plan_sha256"]
+
+    app.begin_evidence()
+    nxt = app.next_action()
+    assert nxt["state"] == "RENDERING_EVIDENCE"
+    assert "evidence-submit" in nxt["next_command"]
+
+
+def test_live_gui_owner_action_can_recover_same_run_after_explicit_reprobe(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = _start(tmp_path, monkeypatch, gui="UNKNOWN")
+    app.begin_evidence()
+    app.submit_evidence({"front": Path("unused.png")})
+    app.submit_visual_review(_accepted_visual_payload(app))
+    run = app.status()
+    assert run["state"] == "OWNER_ACTION_REQUIRED"
+    original_run_id = run["run_id"]
+    assert run["metadata"]["owner_action_path"]
+
+    _capabilities(app, "AVAILABLE")
+    with pytest.raises(CapabilityError, match="newer than the failure"):
+        app.recover_owner_action()
+
+    _capabilities(app, "AVAILABLE", captured_at="2099-09-07T00:00:00Z")
+    recovered = app.recover_owner_action()
+    assert recovered["run_id"] == original_run_id
+    assert recovered["state"] == "AWAITING_LIVE_GUI_REVIEW"
+    assert "owner_action_path" not in recovered["metadata"]
+    assert recovered["metadata"]["last_owner_action_recovery"]["capability_status"] == "AVAILABLE"
 
 
 def test_candidate_variant_budget_is_per_iteration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -549,7 +733,7 @@ def test_checkpoint_restores_method_authority_receipts(
     checkpoint_path = run_dir / checkpointed["metadata"]["active_checkpoint_path"]
     checkpoint = verify_checkpoint(checkpoint_path)
 
-    plan_path = run_dir / "methods" / "method-plan.json"
+    plan_path = run_dir / "methods" / "method-plan-r0.json"
     selection_path = run_dir / "methods" / "method-selection-r0.json"
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
     plan["work_units"][0]["notes"] = ["post-checkpoint mutation"]
@@ -589,7 +773,8 @@ def test_method_reconsideration_checkpoint_preserves_selection_round_without_sel
     app = _start(tmp_path, monkeypatch)
     app.begin_evidence()
     app.submit_evidence({"front": Path("unused.png")})
-    app.submit_visual_review(_revision_visual_payload(app, "METHOD_RECONSIDERATION"))
+    app.submit_visual_review(_revision_visual_payload(app))
+    app.submit_change_impact(_change_impact_payload(app, "METHOD"))
     assert app.status()["metadata"]["method_selection_round"] == 1
     checkpointed = app.checkpoint("resume method reselection")
     assert checkpointed["state"] == "RESUMABLE"

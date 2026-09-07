@@ -4,7 +4,7 @@ import json
 import uuid
 from typing import Any
 
-from .blender import probe_blender
+from .blender import probe_blender, probe_method_environment
 from .contracts import validate_contract
 from .paths import ensure_within
 from .project import ProjectLayout
@@ -78,6 +78,17 @@ def capture_capabilities(
         previous,
         actually_probed=render_review_status is not None,
     )
+    method_environment = (
+        probe_method_environment(blender.executable)
+        if blender_status == "AVAILABLE"
+        else {"status": "UNAVAILABLE", "details": {"reason": "blender_backend_unavailable"}}
+    )
+    method_environment_status = _observed_status(
+        "method_environment",
+        method_environment["status"],
+        previous,
+        actually_probed=blender_status == "AVAILABLE",
+    )
 
     report = {
         "schema_version": 1,
@@ -96,6 +107,11 @@ def capture_capabilities(
                     "probe_retries": blender_attempts - 1,
                 },
                 "observed_at": captured_at,
+            },
+            "method_environment": {
+                "status": method_environment_status,
+                "details": method_environment["details"],
+                "observed_at": captured_at if blender_status == "AVAILABLE" else None,
             },
             "render_image_review": {
                 "status": review_status,

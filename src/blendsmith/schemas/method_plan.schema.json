@@ -1,18 +1,63 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://blendsmith.dev/schemas/method_plan.schema.json",
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "operation": {
+      "type": "object",
+      "required": ["operation_id", "intent", "requirements"],
+      "properties": {
+        "operation_id": {"type": "string", "minLength": 1, "maxLength": 160},
+        "intent": {"type": "string", "minLength": 1, "maxLength": 256},
+        "requirements": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "family_check": {
+      "type": "object",
+      "required": ["intent", "status", "evidence"],
+      "properties": {
+        "intent": {"type": "string", "minLength": 1, "maxLength": 128},
+        "status": {"enum": ["APPLICABLE", "NOT_APPLICABLE"]},
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    }
+  },
   "type": "object",
-  "required": ["schema_version", "run_id", "plan_id", "work_units"],
+  "required": ["schema_version", "run_id", "plan_id", "revision", "work_units"],
   "properties": {
     "schema_version": {"const": 1},
     "run_id": {"type": "string", "minLength": 1},
     "plan_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "revision": {"type": "integer", "minimum": 0},
+    "supersedes_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+    "revision_reason": {"type": ["string", "null"], "minLength": 1},
     "work_units": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["work_unit_id", "intent", "requirements"],
+        "required": [
+          "work_unit_id",
+          "intent",
+          "requirements",
+          "rationale",
+          "stage",
+          "depends_on",
+          "method_family_checks",
+          "method_operations"
+        ],
         "properties": {
           "work_unit_id": {"type": "string", "minLength": 1, "maxLength": 128},
           "intent": {"type": "string", "minLength": 1, "maxLength": 256},
@@ -22,11 +67,43 @@
             "items": {"type": "string", "minLength": 1},
             "uniqueItems": true
           },
+          "rationale": {"type": "string", "minLength": 1},
+          "stage": {"type": "string", "minLength": 1, "maxLength": 128},
+          "depends_on": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1, "maxLength": 128},
+            "uniqueItems": true
+          },
+          "method_family_checks": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"$ref": "#/$defs/family_check"}
+          },
+          "method_operations": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"$ref": "#/$defs/operation"}
+          },
           "notes": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
         },
         "additionalProperties": false
       }
     }
   },
+  "allOf": [
+    {
+      "if": {"properties": {"revision": {"const": 0}}, "required": ["revision"]},
+      "then": {
+        "properties": {
+          "supersedes_sha256": {"type": "null"},
+          "revision_reason": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"revision": {"minimum": 1}}, "required": ["revision"]},
+      "then": {"required": ["supersedes_sha256", "revision_reason"]}
+    }
+  ],
   "additionalProperties": false
 }

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blendsmith.dev/schemas/global_reassessment.schema.json",
+  "$defs": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "candidate_id",
+    "candidate_sha256",
+    "decision",
+    "reviewed_context",
+    "rationale"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "candidate_id": {"type": "string", "minLength": 1},
+    "candidate_sha256": {"$ref": "#/$defs/sha256"},
+    "decision": {"enum": ["CONTINUE_LOCAL", "RESELECT_METHOD", "REVISE_STRUCTURE", "REVISE_CONTRACT"]},
+    "reviewed_context": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "enum": [
+          "METHOD_PLAN",
+          "PRODUCTION_GRAPH",
+          "METHOD_SELECTION",
+          "CANDIDATE",
+          "OPEN_ISSUES",
+          "REPAIR_HISTORY",
+          "GUI_OBSERVATIONS",
+          "OWNER_REQUEST"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "rationale": {"type": "string", "minLength": 1},
+    "affected_work_units": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false
+}

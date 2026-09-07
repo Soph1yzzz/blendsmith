@@ -13,7 +13,8 @@
       "properties": {
         "source": {"enum": ["BLENDER_NATIVE", "GEOMETRY_NODE_TOOLS", "ASSET_LIBRARIES", "EXTENSIONS", "PROJECT_CATALOG", "ADAPTERS"]},
         "status": {"$ref": "#/$defs/source_status"},
-        "evidence": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+        "evidence": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "cache_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
       },
       "additionalProperties": false
     },
@@ -32,16 +33,27 @@
       },
       "additionalProperties": false
     },
+    "waiver": {
+      "type": "object",
+      "required": ["reason", "evidence"],
+      "properties": {
+        "reason": {"type": "string", "minLength": 1},
+        "evidence": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+      },
+      "additionalProperties": false
+    },
     "selection": {
       "type": "object",
-      "required": ["work_unit_id", "specialized_search_complete", "candidate_methods", "selected_method_id", "selection_reason", "remaining_manual_work"],
+      "required": ["work_unit_id", "operation_id", "specialized_search_complete", "candidate_methods", "selected_method_id", "selection_reason", "remaining_manual_work"],
       "properties": {
         "work_unit_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "operation_id": {"type": "string", "minLength": 1, "maxLength": 160},
         "specialized_search_complete": {"const": true},
         "candidate_methods": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/method"}},
         "selected_method_id": {"type": "string", "minLength": 1, "maxLength": 256},
         "selection_reason": {"type": "string", "minLength": 1},
-        "remaining_manual_work": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+        "remaining_manual_work": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "specialized_waiver": {"$ref": "#/$defs/waiver"}
       },
       "additionalProperties": false
     }

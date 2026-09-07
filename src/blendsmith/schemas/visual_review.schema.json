@@ -37,7 +37,6 @@
     "candidate_id": {"type": "string", "minLength": 1},
     "candidate_sha256": {"$ref": "#/$defs/sha256"},
     "verdict": {"enum": ["ACCEPT", "REVISE", "BLOCKED"]},
-    "revision_strategy": {"enum": ["LOCAL_REPAIR", "METHOD_RECONSIDERATION"]},
     "opened_evidence": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
     "perspectives_completed": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
     "issues": {"type": "array", "items": {"$ref": "#/$defs/issue"}},
@@ -47,8 +46,8 @@
   },
   "allOf": [
     {
-      "if": {"properties": {"verdict": {"const": "REVISE"}}},
-      "then": {"required": ["revision_strategy"]}
+      "if": {"properties": {"verdict": {"const": "REVISE"}}, "required": ["verdict"]},
+      "then": {"properties": {"issues": {"minItems": 1}}}
     }
   ],
   "additionalProperties": false

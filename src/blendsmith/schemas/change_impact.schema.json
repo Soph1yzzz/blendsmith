@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blendsmith.dev/schemas/change_impact.schema.json",
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "method_continuity": {
+      "type": "object",
+      "required": ["status", "selected_method_ids", "evidence"],
+      "properties": {
+        "status": {"enum": ["PRESERVE", "RESELECT"]},
+        "selected_method_ids": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "candidate_id",
+    "candidate_sha256",
+    "source",
+    "scope",
+    "issue_ids",
+    "affected_work_units",
+    "rationale",
+    "method_continuity",
+    "global_reassessment_recommended"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "candidate_id": {"type": "string", "minLength": 1},
+    "candidate_sha256": {"$ref": "#/$defs/sha256"},
+    "source": {"enum": ["VISUAL_REVIEW", "LIVE_GUI_REVIEW", "OWNER_REVISION"]},
+    "scope": {"enum": ["LOCAL", "METHOD", "STRUCTURAL", "CONTRACT"]},
+    "issue_ids": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    },
+    "affected_work_units": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    },
+    "rationale": {"type": "string", "minLength": 1},
+    "method_continuity": {"$ref": "#/$defs/method_continuity"},
+    "global_reassessment_recommended": {"type": "boolean"},
+    "upstream_change_summary": {"type": ["string", "null"], "minLength": 1}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"scope": {"const": "LOCAL"}}, "required": ["scope"]},
+      "then": {
+        "properties": {
+          "method_continuity": {
+            "properties": {"status": {"const": "PRESERVE"}}
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"scope": {"const": "METHOD"}}, "required": ["scope"]},
+      "then": {
+        "properties": {
+          "method_continuity": {
+            "properties": {"status": {"const": "RESELECT"}}
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"source": {"enum": ["VISUAL_REVIEW", "LIVE_GUI_REVIEW"]}}, "required": ["source"]},
+      "then": {"properties": {"issue_ids": {"minItems": 1}}}
+    },
+    {
+      "if": {"properties": {"scope": {"enum": ["STRUCTURAL", "CONTRACT"]}}, "required": ["scope"]},
+      "then": {"required": ["upstream_change_summary"]}
+    }
+  ],
+  "additionalProperties": false
+}

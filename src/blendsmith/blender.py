@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 import shutil
 import subprocess
@@ -91,3 +93,61 @@ def probe_blender(configured: str | None = None, *, timeout_seconds: float = 10.
         support_level=support_level,
         details={"returncode": result.returncode},
     )
+
+
+def probe_method_environment(
+    executable: str | None,
+    *,
+    timeout_seconds: float = 20.0,
+) -> dict[str, Any]:
+    if executable is None:
+        return {"status": "UNAVAILABLE", "details": {"reason": "blender_executable_not_found"}}
+
+    expression = (
+        "import bpy,json;"
+        "addons=sorted(bpy.context.preferences.addons.keys());"
+        "libs=sorted((x.name,x.path) for x in bpy.context.preferences.filepaths.asset_libraries);"
+        "print('BLENDSMITH_METHOD_ENV='+json.dumps({'addons':addons,'asset_libraries':libs},sort_keys=True))"
+    )
+    try:
+        result = subprocess.run(
+            [executable, "--background", "--python-expr", expression],
+            check=False,
+            capture_output=True,
+            text=True,
+            errors="replace",
+            timeout=timeout_seconds,
+            shell=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {
+            "status": "BROKEN",
+            "details": {"reason": "method_environment_probe_failed", "error": type(exc).__name__},
+        }
+
+    if result.returncode != 0:
+        return {
+            "status": "BROKEN",
+            "details": {
+                "reason": "method_environment_probe_nonzero",
+                "returncode": result.returncode,
+            },
+        }
+    marker = "BLENDSMITH_METHOD_ENV="
+    line = next((item for item in (result.stdout or "").splitlines() if item.startswith(marker)), None)
+    if line is None:
+        return {"status": "BROKEN", "details": {"reason": "method_environment_marker_missing"}}
+    try:
+        inventory = json.loads(line[len(marker) :])
+    except json.JSONDecodeError:
+        return {"status": "BROKEN", "details": {"reason": "method_environment_json_invalid"}}
+    canonical = json.dumps(inventory, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    fingerprint = hashlib.sha256(canonical).hexdigest()
+    return {
+        "status": "AVAILABLE",
+        "details": {
+            "fingerprint": fingerprint,
+            "addons": inventory.get("addons", []),
+            "asset_libraries": inventory.get("asset_libraries", []),
+        },
+    }

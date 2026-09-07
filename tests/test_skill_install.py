@@ -20,13 +20,13 @@ from blendsmith.skill_install import (
 def test_bundled_skill_is_thin_codex_adapter() -> None:
     text = bundled_skill_bytes().decode("utf-8")
     assert "name: blendsmith" in text
-    assert 'version: "0.0.1"' in text
+    assert 'version: "0.0.2"' in text
     assert "BlendSmithを使って" in text
     assert "CLI/Core is the source of truth" in text
     assert "AI_ACCEPTED != HUMAN_ACCEPTED" in text
     assert "blendsmith schema <contract>" in text
     assert "blendsmith doctor" in text
-    assert bundled_skill_version() == "0.0.1"
+    assert bundled_skill_version() == "0.0.2"
 
 
 def test_skill_install_create_status_and_noop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

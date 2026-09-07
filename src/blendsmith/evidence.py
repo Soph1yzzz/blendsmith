@@ -26,6 +26,7 @@ def materialize_evidence(
     tile_size: int = 896,
     tile_overlap: int = 96,
     jpeg_quality: int = 92,
+    evidence_profiles: Mapping[str, dict] | None = None,
 ) -> tuple[Path, dict]:
     try:
         from PIL import Image, UnidentifiedImageError
@@ -69,10 +70,15 @@ def materialize_evidence(
                 probe.verify()
         except (UnidentifiedImageError, OSError) as exc:
             raise IntegrityError(f"Evidence is not a valid readable image: {source}") from exc
-        if width < minimum_width or height < minimum_height:
-            raise IntegrityError(
-                f"Evidence {key} is {width}x{height}; minimum is {minimum_width}x{minimum_height}"
-            )
+        profile = (evidence_profiles or {}).get(key)
+        _validate_evidence_dimensions(
+            key,
+            width,
+            height,
+            minimum_width=minimum_width,
+            minimum_height=minimum_height,
+            profile=profile,
+        )
 
         review_path = reviews / f"{key}.jpg"
         with Image.open(destination) as image:
@@ -91,6 +97,7 @@ def materialize_evidence(
         records.append(
             {
                 "key": key,
+                "profile": profile,
                 "source_path": os.fspath(source),
                 "managed_path": destination.relative_to(run_dir).as_posix(),
                 "sha256": copied_hash,
@@ -111,6 +118,41 @@ def materialize_evidence(
     bundle_path = root / "evidence.bundle.json"
     atomic_write_json(bundle_path, bundle)
     return bundle_path, bundle
+
+
+def _validate_evidence_dimensions(
+    key: str,
+    width: int,
+    height: int,
+    *,
+    minimum_width: int,
+    minimum_height: int,
+    profile: dict | None,
+) -> None:
+    if profile is None:
+        required_long = max(minimum_width, minimum_height)
+        required_short = min(minimum_width, minimum_height)
+        if max(width, height) < required_long or min(width, height) < required_short:
+            raise IntegrityError(
+                f"Evidence {key} is {width}x{height}; minimum edges are "
+                f"long={required_long}, short={required_short}"
+            )
+        return
+
+    required_width = int(profile["minimum_width"])
+    required_height = int(profile["minimum_height"])
+    if width < required_width or height < required_height:
+        raise IntegrityError(
+            f"Evidence {key} is {width}x{height}; profile minimum is "
+            f"{required_width}x{required_height}"
+        )
+    orientation = profile["orientation"]
+    if orientation == "LANDSCAPE" and width <= height:
+        raise IntegrityError(f"Evidence {key} must be landscape")
+    if orientation == "PORTRAIT" and height <= width:
+        raise IntegrityError(f"Evidence {key} must be portrait")
+    if orientation == "SQUARE" and width != height:
+        raise IntegrityError(f"Evidence {key} must be square")
 
 
 def _write_tiles(

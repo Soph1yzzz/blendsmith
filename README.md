@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="docs/assets/blendsmith-readme-hero.png" alt="BlendSmith — a production loop harness for AI-assisted Blender" width="100%">
+  <img src="docs/assets/blendsmith-readme-hero.png" alt="BlendSmith — a production control loop for AI-assisted Blender" width="100%">
 </p>
 
 <h1 align="center">BlendSmith</h1>
 
-<p align="center"><strong>A production loop harness for AI-assisted Blender.</strong></p>
-<p align="center">Choose better methods. Inspect real evidence. Repair deliberately. Stop at human approval.</p>
+<p align="center"><strong>If you're giving Blender to an AI agent, put this in the loop.</strong></p>
+<p align="center">Strong models can already build. BlendSmith keeps the production decisions from drifting.</p>
 
 <p align="center">
   <a href="https://github.com/Soph1yzzz/blendsmith/releases/latest"><img src="https://img.shields.io/github/v/release/Soph1yzzz/blendsmith?style=flat-square&label=release" alt="Latest release"></a>
@@ -25,19 +25,32 @@
   <strong><a href="docs/SPECIFICATION.md">Specification</a></strong>
 </p>
 
-BlendSmith is a **model-independent loop harness for Blender agents**. It does not replace the model, Blender, MCP, `bpy`, or GUI automation. It wraps them in a production loop that manages **method planning, method selection, candidate evidence, visual review, repair or method reselection, checkpointing, exact human approval, retention, and verified publication**.
+If you want an AI agent to do serious Blender work, do not stop at a prompt and hope it keeps making the right decisions. **Put BlendSmith around it.**
 
-The point is not to make an incapable model look capable. The point is to make capable models operate inside a repeatable control loop instead of treating each Blender task as a one-shot improvisation.
+BlendSmith is a **model-independent production control loop for Blender agents**. It does not replace the model, Blender, MCP, `bpy`, or GUI automation. It gives them production structure: **decompose the job, expose method-relevant operations, choose dedicated Blender methods before scratch work, track dependencies, inspect rendered and live-GUI evidence, classify what actually went wrong, and return to the right upstream decision before continuing**.
 
-> With the arrival of **GPT-6 Astra**, modern models can already build impressive 3D assets. BlendSmith exists because **being able to build something is not the same as consistently choosing the right Blender method, inspecting the result, recovering safely, iterating deliberately, and handing an exact reviewed artifact to a human.**
+The core idea is simple: **a visible defect does not tell you where the mistake was made**. The right response may be a local edit, a different Blender method, a Production Graph change, or an upstream contract revision. BlendSmith forces that distinction before the agent is allowed to keep patching.
+
+This is not a crutch for weak models. Capable models already make strong 3D assets. **BlendSmith is the control layer for keeping a capable model on a coherent production path across a long run.**
+
+> Use the model for intelligence. Use BlendSmith for production discipline. If the output is wrong, do not just tell the agent to “try again” — make it return to the level where the bad decision entered the system.
 
 ## What can this workflow produce?
 
-The private Blender harness that evolved into BlendSmith was already producing work like this with **GPT-5.6 Sol High**.
+I am a beginner at Blender and 3D. These examples are not the result of a Blender expert standing beside the model and manually steering every modeling decision.
 
-<p align="center">
-  <img src="assets/examples/gothic-interior.png" alt="AI-assisted Gothic interior created in Blender" width="100%">
-</p>
+In my own production use, **GPT-5.6 Sol was noticeably weak at Blender when used close to its default behavior: method choice was inconsistent, dedicated Blender features were easy to miss, and review tended to stay too local.** I moved method selection, evidence review, repair, reselection, and approval into an external harness and gave the model an explicit production loop.
+
+With the same GPT-5.6 Sol, that workflow was already producing work like this.
+
+<table>
+  <tr>
+    <td align="center"><img src="assets/examples/gothic-interior.png" alt="AI-assisted Gothic interior created in Blender" width="100%"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Gothic architecture / large-scale interior</b></td>
+  </tr>
+</table>
 
 <table>
   <tr>
@@ -50,11 +63,19 @@ The private Blender harness that evolved into BlendSmith was already producing w
   </tr>
 </table>
 
-BlendSmith is the public, model-neutral harness distilled from that production workflow. Output quality still depends on the model, references, available Blender capabilities, and iteration. BlendSmith governs the **loop around production** rather than pretending to be the artist itself.
+That is the starting point: **BlendSmith is not about teaching an AI to make 3D. It is about keeping an AI that can already make 3D from losing the production thread over a long run.**
 
-### Current-generation dogfood
+Can it keep choosing the right methods? Notice when a local-looking defect is really an upstream problem? Inspect what fixed renders miss? Return to the right layer instead of turning the asset into patchwork? BlendSmith is built for that part.
 
-A light internal dogfood run with **GPT-6 Astra** on an ornate sword task also found the harness useful. The model could already produce the asset and revise an earlier candidate on its own, while BlendSmith still added useful production discipline through method discovery, exact candidate pinning, six-view evidence, live-GUI verification, and a hard stop at `OWNER_REVIEW`.
+Output quality still depends on the model, references, available Blender capabilities, and iteration. But if you already have a strong model and a way for it to operate Blender, **put BlendSmith between the two and let it govern the production loop**.
+
+### The same direction held with the current generation
+
+This is not a quantitative benchmark; it is a comparison from the author's own production use. But the difference I saw with GPT-5.6 Sol did not disappear when the model got stronger.
+
+In a small internal dogfood run with **GPT-6 Astra** on an ornate sword task, the model could already produce the asset and revise an earlier candidate on its own. Even then, BlendSmith kept method discovery, exact candidate pinning, six-view evidence, exploratory live-GUI inspection, and the hard stop at `OWNER_REVIEW` inside one production loop.
+
+**A stronger model did not make the external production loop irrelevant.** In this small test, the same general effect remained: the harness still improved how the work was structured, inspected, and handed off.
 
 <p align="center">
   <img src="docs/assets/blendsmith-astra-dogfood.png" alt="BlendSmith GPT-6 Astra dogfood proof panel" width="100%">
@@ -62,38 +83,67 @@ A light internal dogfood run with **GPT-6 Astra** on an ornate sword task also f
 
 ## The production loop
 
-Open-ended AI 3D work becomes more reliable when creation, inspection, correction, and authority are part of the same explicit loop.
+v0.0.2 changes the loop from **review -> patch -> review** into a production structure that can move back to the level where the bad decision entered the system.
 
-<p align="center">
-  <img src="docs/assets/blendsmith-control-loop.png" alt="BlendSmith production control loop" width="100%">
-</p>
+```text
+request
+  -> decompose work
+  -> Production Graph
+  -> account for known method families
+  -> method selection
+  -> Blender production
+  -> candidate pin
+  -> render evidence
+  -> visual review
+       -> issue / improvement found
+            -> Change Impact Gate
+                 -> LOCAL      -> preserve method -> bounded Fix Plan
+                 -> METHOD     -> Method Selection
+                 -> STRUCTURAL -> revise Production Graph / Method Plan
+                 -> CONTRACT   -> revise upstream contract / plan
+       -> render accepted
+            -> Exploratory Live GUI Review
+                 -> orbit / zoom / unseen angles / hidden surfaces
+                 -> REVISE -> Change Impact Gate
+                 -> PASS   -> final AI validation
+  -> AI_ACCEPTED
+  -> OWNER_REVIEW
+```
 
-A review does not merely answer “good or bad.” It decides what kind of next move is justified:
+If local repairs keep stacking up, BlendSmith can interrupt them with **Global Reassessment**. The agent has to look again at the Method Plan, Production Graph, Method Selection, candidate, open issues, and repair history before it is allowed to decide that another local patch is still the right move.
 
-- **Local repair** — the method is sound; fix a bounded defect and re-enter production.
-- **Method reselection** — the approach itself is wrong; return to method selection instead of hand-patching forever.
-- **AI acceptance** — machine-side gates passed; advance to the human authority boundary.
+This gives each kind of failure a different return path:
 
-That review-and-repair loop ends deliberately at:
+- **LOCAL** — the plan and method are sound; preserve the selected method and fix a bounded defect.
+- **METHOD** — the construction method is wrong; reselect it instead of recreating a Blender feature by hand.
+- **STRUCTURAL** — the dependency structure is wrong; revise the Production Graph and invalidate downstream work.
+- **CONTRACT** — the upstream requirement itself changed or was wrong; supersede the old immutable plan instead of hiding the change in implementation.
+
+The GUI stage is not a checkbox at the end. When available, it is an **exploratory review layer** for things fixed renders often miss: thickness, attachments, hidden surfaces, weak detail density, material response, and geometry that only looks wrong after orbiting around it.
+
+The loop still ends deliberately at:
 
 ```text
 AI_ACCEPTED != HUMAN_ACCEPTED
 ```
 
-The agent can propose progress. BlendSmith Core decides whether that progress is valid. The owner decides whether the exact reviewed artifact is accepted.
+The agent proposes actions. BlendSmith Core decides which transitions are valid. The owner decides whether the exact reviewed artifact is accepted.
 
-## Why BlendSmith?
+## Why not just use the model?
 
 | Common agent failure | BlendSmith response |
 | --- | --- |
-| The model knows a Blender feature exists, but forgets to use it | **Method Selection Gate** — specialized methods are evaluated before production |
+| The model knows a Blender feature exists, but forgets to use it | **Method-family accounting + Method Selection Gate** — every known family is explicitly marked applicable or not before production |
+| A repair quietly switches from Mirror/Array/etc. to hand-built geometry | **Method Continuity Gate** — LOCAL repair must preserve the validated methods for the affected work units |
+| A visible problem is actually caused by the plan, not the mesh | **Change Impact Gate** — classify it as LOCAL / METHOD / STRUCTURAL / CONTRACT before editing |
+| Small fixes keep accumulating and the whole asset starts drifting | **Global Reassessment** — stop patch stacking and review the whole production context |
+| Fixed renders look fine, but the object feels wrong when rotated | **Exploratory Live GUI Review** — orbit, zoom, inspect hidden angles, thickness, attachments, detail density, and material response |
+| Method discovery is repeated even though the environment did not change | **Environment-bound discovery cache** — reuse only facts whose freshness Core can prove; recheck the rest |
 | A candidate exists, so the agent declares success | **Evidence-backed review** — actual views must be opened and evaluated |
-| Endless hand-tweaking after choosing the wrong approach | **Method reconsideration** — loop back to method selection instead of patching forever |
 | The agent says “looks good” | **AI acceptance is separate from human acceptance** |
 | A file changes after review | **SHA-bound authority** — approval names the exact reviewed bytes |
-| GUI capability breaks | **No silent downgrade** — `BROKEN` / `UNKNOWN` cannot be disguised as `UNAVAILABLE` |
+| GUI capability breaks | **No silent downgrade + fresh recovery** — same-run recovery requires a newer explicit reprobe |
 | A long run is interrupted | **Checkpoint / resume** — restore validated loop authority rather than improvising from memory |
-| Old heavy artifacts accumulate forever | **TTL + verified GC** — only eligible managed data can be cleaned up |
 
 BlendSmith does not promise that every loop ends in success. It makes the outcome explicit: continue through a valid repair/reselection path, escalate an unresolved condition, or stop at the owner boundary with inspectable evidence.
 
@@ -107,7 +157,9 @@ The production loop therefore starts with method discipline rather than immediat
   <img src="docs/assets/blendsmith-method-selection.png" alt="BlendSmith specialized-first method selection" width="100%">
 </p>
 
-Before production, BlendSmith requires work-unit planning and a machine-validated method-selection receipt. The default discovery policy accounts for:
+Before production, BlendSmith requires a dependency-aware Method Plan. Each work unit must explicitly account for every known method family as **APPLICABLE** or **NOT_APPLICABLE**. If `symmetry` is applicable, for example, the plan must contain a `symmetry` operation; the agent cannot hide it inside a broad “build the sword” operation and silently miss `Mirror`.
+
+After decomposition, BlendSmith requires a machine-validated method-selection receipt. The default discovery policy accounts for:
 
 - Blender native functionality
 - Geometry Node tools
@@ -118,6 +170,9 @@ Before production, BlendSmith requires work-unit planning and a machine-validate
 
 Known method hints must be explicitly accounted for. A relevant specialized method left `UNKNOWN`, or a required discovery source left `BROKEN` / `UNKNOWN`, blocks fallback instead of silently authorizing scratch construction.
 
+Method discovery can be cached, but cache is deliberately **not selection authority**. v0.0.2 only reuses discovery facts when Core can prove the relevant freshness boundary. Sources without a Core-owned freshness fingerprint are rechecked live rather than receiving a convenient but stale cache hit.
+
+Method Selection v2 also distinguishes fit quality: a `SPECIALIZED + FULL` method wins by default, while `GENERAL_PURPOSE + FULL` may displace `SPECIALIZED + PARTIAL_LOCAL_REFINEMENT` only with an explicit evidence-backed waiver. Scratch remains the last fallback.
 Examples of built-in discovery hints include:
 
 ```text
@@ -176,18 +231,28 @@ A typical production loop looks like this:
 
 ```text
 preflight
-  -> method plan
+  -> method plan / Production Graph
+  -> method-family accounting
   -> method selection
   -> Blender production
   -> candidate pin
   -> multi-view evidence
   -> visual review
-       -> local repair -> production, or
-       -> method reconsideration -> method selection
-  -> live GUI review when available
+       -> Change Impact Gate
+            -> LOCAL      -> method continuity -> fix plan -> production
+            -> METHOD     -> method selection
+            -> STRUCTURAL -> upstream graph/plan revision
+            -> CONTRACT   -> upstream contract/plan revision
+       -> render accepted
+            -> exploratory live GUI review
+                 -> REVISE -> Change Impact Gate
+                 -> PASS
+  -> final AI validation
   -> AI_ACCEPTED
   -> OWNER_REVIEW
 ```
+
+Repeated LOCAL repair can be interrupted by **Global Reassessment** before another patch is authorized.
 
 At `OWNER_REVIEW`, automatic progress stops.
 
@@ -223,14 +288,19 @@ blendsmith schema visual_review
 Useful lifecycle commands include:
 
 ```bash
+blendsmith next --project <project>
 blendsmith method-hints --project <project> --intent symmetry
+blendsmith method-cache --project <project> --intent symmetry
 blendsmith method-plan --project <project> --input method_plan.json
 blendsmith method-select --project <project> --input method_selection.json
 blendsmith candidate-add --project <project> --candidate <scene.blend>
 blendsmith evidence-begin --project <project>
 blendsmith evidence-submit --project <project> --view front=<front.png>
 blendsmith visual-review --project <project> --input visual_review.json
+blendsmith change-impact --project <project> --input change_impact.json
+blendsmith global-reassess --project <project> --input global_reassessment.json
 blendsmith gui-review --project <project> --input live_gui_review.json
+blendsmith owner-action-recover --project <project>
 blendsmith ai-accept --project <project>
 blendsmith owner-accept --project <project> --sha256 <candidate_sha256>
 blendsmith checkpoint --project <project>
@@ -244,12 +314,18 @@ The CLI rejects unauthorized transitions instead of relying on the agent to reme
 ## Core guarantees
 
 - **Loop authority lives in Core.** The agent proposes actions; the deterministic Core validates state transitions.
-- **Specialized first, scratch last.** Viable dedicated methods take precedence over generic construction.
+- **Decomposition is explicit.** Every known method family is accounted for before a work unit can enter Method Selection.
+- **Production structure is explicit.** Work units carry rationale, stage, and dependency edges; upstream revision can invalidate downstream work.
+- **Specialized first, scratch last.** Viable dedicated methods take precedence over generic construction, with a narrow evidence-backed waiver for full-fit general methods over partial specialized ones.
+- **Method continuity survives repair.** LOCAL fixes must preserve the methods already authorized for the affected work units.
+- **Change depth is classified before editing.** LOCAL, METHOD, STRUCTURAL, and CONTRACT changes return to different levels of the loop.
+- **Patch stacking is bounded by a global view.** Repeated local repair can force reassessment of the whole production context.
 - **Exact method authority.** Candidate manifests bind the exact Method Selection SHA, which binds the exact Method Plan SHA.
-- **Validated receipts are immutable.** Editing an accepted plan or selection behind the lifecycle causes an integrity failure.
+- **Validated receipts are immutable.** Upstream revisions supersede prior SHA-bound plans instead of rewriting them in place.
 - **Evidence is real input to review.** Visual acceptance requires opened evidence; file existence alone is not visual review.
-- **Repair and reselection are different loop paths.** A local defect does not automatically justify keeping a bad production method.
-- **Live GUI verification is concrete.** A GUI `PASS` requires path, dirty-state, interaction, and observed-view evidence.
+- **Live GUI review is exploratory.** `PASS` requires orbit, zoom, an unseen viewpoint, concrete observations, and multiple coverage categories; meaningful quality-gain issues cannot be ignored.
+- **Recovery needs fresh evidence.** A GUI owner-action can resume the same run only after a newer explicit capability reprobe.
+- **Discovery cache is bounded.** Cached facts are evidence only, and sources without a provable freshness boundary must be checked again.
 - **Human authority is explicit and SHA-bound.** Only the owner can accept the exact reviewed candidate.
 - **Retries are bounded.** Retry-safe operations get an initial attempt plus at most three retries; unsafe ambiguity escalates.
 - **Checkpoints preserve authority.** Method receipts and candidate closure are pinned and revalidated on resume.
@@ -294,9 +370,11 @@ CI covers Python 3.11 / 3.12 on Windows and Ubuntu.
 
 ## Status
 
-**v0.0.1** is the first public release. It includes the model-neutral Core/CLI, production-loop state machine, Method Selection Gate, evidence and visual-review contracts, bounded repair, method reconsideration, live-GUI verification, owner authority, checkpoint/resume, retention/GC, verified local publication, and the bundled Codex Skill.
+**v0.0.2 — Production Structure** is the current release.
 
-Next: **v0.0.2 — Production Structure**, focused on decomposition, dependency-aware production graphs, construction sequence, structural integrity, safer recovery, and agent-facing introspection. See the [roadmap](docs/ROADMAP.md).
+It turns the original review/repair loop into a dependency-aware production loop with explicit decomposition, method-family accounting, Production Graph revision, Change Impact, Method Continuity, Global Reassessment, exploratory GUI review, safer same-run recovery, bounded discovery caching, evidence profiles, and `next` introspection.
+
+**v0.0.1** remains the first public release and the baseline for the original loop.
 
 ## License
 

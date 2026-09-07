@@ -18,6 +18,8 @@ SCHEMA_FILES = {
     "visual_review": "visual_review.schema.json",
     "fix_plan": "fix_plan.schema.json",
     "live_gui_review": "live_gui_review.schema.json",
+    "change_impact": "change_impact.schema.json",
+    "global_reassessment": "global_reassessment.schema.json",
     "owner_decision": "owner_decision.schema.json",
     "owner_action_required": "owner_action_required.schema.json",
     "retention_record": "retention_record.schema.json",
@@ -74,6 +76,22 @@ def _runtime_invariants(name: str, payload: dict[str, Any]) -> None:
         if len(primary) > 2:
             raise ContractError("A fix plan may address at most two primary issues")
 
+    if name == "global_reassessment":
+        required_context = {
+            "METHOD_PLAN",
+            "PRODUCTION_GRAPH",
+            "METHOD_SELECTION",
+            "CANDIDATE",
+            "OPEN_ISSUES",
+            "REPAIR_HISTORY",
+        }
+        missing_context = sorted(required_context - set(payload.get("reviewed_context", [])))
+        if missing_context:
+            raise ContractError(
+                "Global reassessment must review the whole production context; missing: "
+                + ", ".join(missing_context)
+            )
+
     if name == "live_gui_review" and payload["status"] == "PASS":
         required_true = (
             "blend_path_verified",
@@ -82,10 +100,22 @@ def _runtime_invariants(name: str, payload: dict[str, Any]) -> None:
         )
         if not all(payload.get(field) is True for field in required_true):
             raise ContractError("GUI PASS requires path, dirty-state, and viewport checks")
-        if not payload.get("views_observed"):
-            raise ContractError("GUI PASS requires at least one observed view")
+        actions = set(payload.get("exploration_actions", []))
+        if "ORBIT" not in actions or "ZOOM" not in actions:
+            raise ContractError("GUI PASS requires exploratory orbit and zoom inspection")
+        if not actions.intersection({"UNSEEN_ANGLE", "BACKSIDE", "UNDERSIDE"}):
+            raise ContractError("GUI PASS requires at least one viewpoint not covered by the fixed render review")
+        coverage = set(payload.get("coverage", []))
+        if len(coverage) < 3:
+            raise ContractError("GUI PASS requires at least three exploratory coverage categories")
+        if len(payload.get("views_observed", [])) < 3:
+            raise ContractError("GUI PASS requires at least three observed GUI views")
+        if len(payload.get("observations", [])) < 2:
+            raise ContractError("GUI PASS requires concrete exploratory observations")
         if any(issue.get("blocking", False) for issue in payload.get("issues", [])):
             raise ContractError("GUI PASS cannot contain a blocking issue")
+        if any(issue.get("quality_gain") in {"MEDIUM", "HIGH"} for issue in payload.get("issues", [])):
+            raise ContractError("GUI PASS cannot ignore a medium/high quality-gain opportunity")
 
     if (
         name == "live_gui_review"
@@ -152,6 +182,7 @@ def _validate_timestamps(name: str, payload: dict[str, Any]) -> None:
         "candidate_manifest": ("created_at",),
         "checkpoint": ("created_at",),
         "owner_decision": ("decided_at",),
+        "owner_action_required": ("raised_at",),
         "retention_record": ("created_at", "expires_at"),
         "publication_manifest": ("published_at",),
     }

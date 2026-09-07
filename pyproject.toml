@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "blendsmith"
-version = "0.0.1"
-description = "Production loop harness for AI-assisted Blender: method selection, visual QA, repair, checkpoints, and human approval"
+version = "0.0.2"
+description = "Production control loop for AI-assisted Blender: decomposition, method selection, review, recovery, and human approval"
 readme = "README.md"
-license = { file = "LICENSE" }
+license = "Apache-2.0"
 requires-python = ">=3.11"
 keywords = [
   "blender",
@@ -22,10 +22,6 @@ keywords = [
 dependencies = [
   "jsonschema>=4.21,<5",
   "Pillow>=10,<13",
-]
-
-classifiers = [
-  "License :: OSI Approved :: Apache Software License",
 ]
 
 [project.optional-dependencies]

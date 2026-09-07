@@ -78,6 +78,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "jpeg_quality": 92,
         "required_evidence": [],
         "required_perspectives": [],
+        "evidence_profiles": {},
     },
     "method_selection": {
         "required": True,
@@ -91,6 +92,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
         ],
         "scratch_requires_specialized_exhaustion": True,
         "require_catalog_hint_accounting": True,
+        "method_cache_epoch": 0,
+    },
+    "production_structure": {
+        "global_reassessment_after_local_repairs": 2,
+        "max_gui_quality_gain_issues": 2,
     },
     "recovery": {"max_retries": 3, "escalate_non_retryable_immediately": True},
     "provenance": {"required_for_publication": False},
@@ -129,6 +135,16 @@ def initialize_project(root: Path, *, project_id: str | None = None) -> ProjectL
     return layout
 
 
+def _merge_config_defaults(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str, Any]:
+    merged = json.loads(json.dumps(defaults))
+    for key, value in current.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _merge_config_defaults(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
 def load_project(root: Path) -> tuple[ProjectLayout, dict[str, Any]]:
     root = Path(root).expanduser()
     if root.exists() and _is_reparse_point(root):
@@ -142,7 +158,8 @@ def load_project(root: Path) -> tuple[ProjectLayout, dict[str, Any]]:
     for managed in (layout.control, layout.install, layout.capabilities, layout.runs, layout.history):
         if managed.exists() and _is_reparse_point(managed):
             raise SafetyError(f"Managed BlendSmith path cannot be a reparse point: {managed}")
-    config = json.loads(layout.config.read_text(encoding="utf-8"))
+    raw_config = json.loads(layout.config.read_text(encoding="utf-8"))
+    config = _merge_config_defaults(DEFAULT_CONFIG, raw_config)
     validate_contract("project", config)
     return layout, config
 

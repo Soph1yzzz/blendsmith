@@ -66,6 +66,10 @@ def build_parser() -> argparse.ArgumentParser:
     hints.add_argument("--project", required=True)
     hints.add_argument("--intent")
 
+    cache = sub.add_parser("method-cache", help="Show reusable method-discovery facts for the current environment")
+    cache.add_argument("--project", required=True)
+    cache.add_argument("--intent")
+
     method_plan = sub.add_parser("method-plan", help="Submit work units before production begins")
     method_plan.add_argument("--project", required=True)
     method_plan.add_argument("--input", required=True)
@@ -76,6 +80,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     status = sub.add_parser("status", help="Show current run state")
     status.add_argument("--project", required=True)
+
+    nxt = sub.add_parser("next", help="Show the next valid BlendSmith action and authoritative identities")
+    nxt.add_argument("--project", required=True)
+
+    recover = sub.add_parser(
+        "owner-action-recover",
+        help="Recover a supported OWNER_ACTION_REQUIRED condition after reprobe",
+    )
+    recover.add_argument("--project", required=True)
 
     candidate_add = sub.add_parser("candidate-add", help="Ingest a candidate after method selection")
     candidate_add.add_argument("--project", required=True)
@@ -104,6 +117,17 @@ def build_parser() -> argparse.ArgumentParser:
     vr = sub.add_parser("visual-review", help="Submit an external visual-review contract")
     vr.add_argument("--project", required=True)
     vr.add_argument("--input", required=True)
+
+    ci = sub.add_parser(
+        "change-impact",
+        help="Classify a requested change as local, method, structural, or contract-level",
+    )
+    ci.add_argument("--project", required=True)
+    ci.add_argument("--input", required=True)
+
+    gra = sub.add_parser("global-reassess", help="Submit a whole-plan reassessment when local repair should pause")
+    gra.add_argument("--project", required=True)
+    gra.add_argument("--input", required=True)
 
     fp = sub.add_parser("fix-plan", help="Submit an external bounded fix-plan contract")
     fp.add_argument("--project", required=True)
@@ -198,12 +222,18 @@ def main(argv: list[str] | None = None) -> int:
             result = app.start(blender_path=args.blender)
         elif args.command == "method-hints":
             result = app.method_hints(args.intent)
+        elif args.command == "method-cache":
+            result = app.method_cache(args.intent)
         elif args.command == "method-plan":
             result = app.submit_method_plan(_json_file(args.input))
         elif args.command == "method-select":
             result = app.submit_method_selection(_json_file(args.input))
         elif args.command == "status":
             result = app.status()
+        elif args.command == "next":
+            result = app.next_action()
+        elif args.command == "owner-action-recover":
+            result = app.recover_owner_action()
         elif args.command in {"candidate-add", "variant-add"}:
             result = app.add_variant(
                 Path(args.candidate),
@@ -217,6 +247,10 @@ def main(argv: list[str] | None = None) -> int:
             result = app.submit_evidence(_views(args.view))
         elif args.command == "visual-review":
             result = app.submit_visual_review(_json_file(args.input))
+        elif args.command == "change-impact":
+            result = app.submit_change_impact(_json_file(args.input))
+        elif args.command == "global-reassess":
+            result = app.submit_global_reassessment(_json_file(args.input))
         elif args.command == "fix-plan":
             result = app.submit_fix_plan(_json_file(args.input))
         elif args.command == "gui-review":

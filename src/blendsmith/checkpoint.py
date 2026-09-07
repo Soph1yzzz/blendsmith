@@ -142,6 +142,7 @@ def materialize_checkpoint(
         "created_at": iso_now(),
         "resume_state": resume_state,
         "iteration": run["iteration"],
+        "method_plan_revision": int(run["metadata"].get("method_plan_revision", 0)),
         "method_selection_round": int(run["metadata"].get("method_selection_round", 0)),
         "candidate_id": candidate_id,
         "candidate_sha256": candidate_sha256,
@@ -201,6 +202,8 @@ def verify_checkpoint(checkpoint_path: Path) -> dict[str, Any]:
     )
     if plan is not None and plan["run_id"] != payload["run_id"]:
         raise IntegrityError("Checkpoint method plan belongs to a different run")
+    if plan is not None and plan["revision"] != payload["method_plan_revision"]:
+        raise IntegrityError("Checkpoint method-plan revision mismatch")
     if selection is not None:
         if plan is None:
             raise IntegrityError("Checkpoint method selection has no method plan")
@@ -258,6 +261,7 @@ def restore_checkpoint_methods(checkpoint_path: Path, run_dir: Path) -> dict[str
     result: dict[str, Any] = {
         "method_plan_path": None,
         "method_plan_id": None,
+        "method_plan_revision": None,
         "method_plan_sha256": None,
         "method_selection_path": None,
         "method_selection_round": None,
@@ -266,12 +270,14 @@ def restore_checkpoint_methods(checkpoint_path: Path, run_dir: Path) -> dict[str
 
     if payload["method_plan_snapshot_path"] is not None:
         source = ensure_within(root, root / payload["method_plan_snapshot_path"])
-        destination = ensure_within(run_dir, methods_root / "method-plan.json")
+        revision = int(payload["method_plan_revision"])
+        destination = ensure_within(run_dir, methods_root / f"method-plan-r{revision}.json")
         _restore_snapshot_file(source, destination, payload["method_plan_sha256"])
         plan = json.loads(destination.read_text(encoding="utf-8"))
         validate_contract("method_plan", plan)
         result["method_plan_path"] = destination.relative_to(run_dir).as_posix()
         result["method_plan_id"] = plan["plan_id"]
+        result["method_plan_revision"] = revision
         result["method_plan_sha256"] = payload["method_plan_sha256"]
 
     if payload["method_selection_snapshot_path"] is not None:

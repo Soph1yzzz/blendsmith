@@ -3,17 +3,18 @@ name: blendsmith
 description: >
   Operate Blender work through the installed BlendSmith CLI/Core when the user
   explicitly names BlendSmith as the mechanism to use, such as "BlendSmithを使って",
-  "Use BlendSmith", or "$blendsmith". BlendSmith owns method-selection, evidence,
-  review, repair, human-approval, checkpoint, retention, and publication gates.
-  Do not invoke this Skill merely because a task happens to involve Blender.
+  "Use BlendSmith", or "$blendsmith". BlendSmith owns production structure,
+  method-selection, evidence, review, change-impact routing, repair/reselection,
+  human approval, checkpoint, retention, and publication gates. Do not invoke this
+  Skill merely because a task happens to involve Blender.
 metadata:
-  version: "0.0.1"
+  version: "0.0.2"
 ---
 
 # BlendSmith
 
-BlendSmith is the authoritative production harness. This Skill is only the thin
-Codex operating layer around the installed `blendsmith` CLI/Core.
+BlendSmith is the authoritative production-loop harness. This Skill is only the
+thin Codex operating layer around the installed `blendsmith` CLI/Core.
 
 ## Invocation gate
 
@@ -30,17 +31,14 @@ Before work:
 
 1. Run `blendsmith --version` and fail clearly if the CLI is unavailable.
 2. Run `blendsmith doctor`. Continue only when it returns `ready: true` and the
-   installed Skill status is `CURRENT`. A stale, modified, missing, or unsafe
-   Skill is an invalid operating state; do not emulate the current Core from an
-   older Skill. Ask the user to reinstall/update the Skill and restart Codex.
-3. Use `blendsmith --help` and command-specific `--help` when the current CLI
-   behavior is unclear.
-4. Use `blendsmith schema <contract>` before authoring a JSON contract whose
-   exact fields are not already known from the current run.
-5. Use `blendsmith status --project <project>` to decide what operation is
-   currently authorized.
-6. Never bypass a rejected transition, failed integrity check, unresolved
-   capability, or owner gate.
+   installed Skill status is `CURRENT`.
+3. Use `blendsmith next --project <project>` as the primary state/introspection
+   surface. It exposes the next valid action, authoritative plan/selection hashes,
+   active candidate identity/path, and method-cache status.
+4. Use command-specific `--help` and `blendsmith schema <contract>` whenever a
+   current contract is not known exactly.
+5. Never bypass a rejected transition, stale SHA, unresolved capability,
+   change-impact gate, global reassessment, or owner gate.
 
 `AI_ACCEPTED != HUMAN_ACCEPTED`. Never run `owner-accept` unless the owner has
 explicitly accepted the exact candidate presented for review.
@@ -58,58 +56,122 @@ Then capture runtime capabilities and start the run:
 
 `blendsmith start --project <project> [--blender <path>]`
 
-Do not attach an initial candidate before the Method Selection Gate is complete.
+Do not attach an initial candidate before the production structure and Method
+Selection Gate are complete.
+
+## Production structure
+
+At `AWAITING_METHOD_PLAN`, do not submit one broad work unit when the task hides
+meaningfully different method families. Decompose the work into units that have a
+clear rationale, stage, dependencies, and method-selectable operations. For every
+work unit, account for every method family required by the current `method_plan`
+schema as `APPLICABLE` or `NOT_APPLICABLE` with concise evidence. Any family marked
+`APPLICABLE` must have its own matching method operation. This accounting step is
+not optional even when the overall object could be described as one thing.
+
+The Method Plan is a dependency-aware Production Graph. Ask:
+
+- why does this work unit exist?
+- what must exist before it?
+- what later work depends on it?
+- which operation needs a dedicated Blender method?
+
+A revised upstream plan must supersede the exact previous plan SHA. Never edit an
+already validated Method Plan in place.
+
+## Method discovery and selection
+
+Use `blendsmith method-hints` for built-in dedicated-method hints. Before repeating
+expensive discovery, inspect `blendsmith method-cache --project <project>
+[--intent <intent>]`.
+
+The cache contains reusable discovery facts only. It is not selection authority.
+A current Method Selection contract still has to evaluate those facts against the
+current requirements.
+
+Selection policy:
+
+- `SPECIALIZED + FULL`: normally preferred over generic construction.
+- `SPECIALIZED + PARTIAL_LOCAL_REFINEMENT` versus `GENERAL_PURPOSE + FULL`:
+  general-purpose may win only with the current evidence-backed waiver required by
+  the schema.
+- unresolved specialized candidates block fallback.
+- scratch construction remains the last fallback.
+
+During later repair, preserve the already selected method when it still fits.
+Do not start hand-building a replacement for a capability that is already the
+validated method for that operation.
+
+## Review and change routing
+
+Evidence review and live GUI review do not jump directly into arbitrary repair.
+When either review returns `REVISE`, BlendSmith enters `AWAITING_CHANGE_IMPACT`.
+Classify the change at the correct abstraction level:
+
+- `LOCAL`: bounded defect; preserve current method authority and enter Fix Plan.
+- `METHOD`: current construction method is wrong; return to Method Selection.
+- `STRUCTURAL`: work-unit dependencies or production structure must change; revise
+  the Method Plan / Production Graph.
+- `CONTRACT`: the upstream requirement itself is wrong; revise the upstream plan
+  rather than hiding the change in implementation.
+
+If local repair repeats or the change-impact contract recommends it, the Core may
+enter `AWAITING_GLOBAL_REASSESSMENT`. Stop patching and reassess the current plan,
+graph, methods, candidate, issues, and repair history before deciding whether to
+continue locally, reselect a method, revise structure, or revise contract.
+
+## Exploratory live GUI review
+
+`AWAITING_LIVE_GUI_REVIEW` is exploratory visual QA, not merely proof that Blender
+opened. Use real GUI/computer interaction when available:
+
+- orbit the asset and inspect unseen angles;
+- zoom into connections, thickness, ornament, and dense detail;
+- inspect rear/underside/occluded surfaces;
+- inspect material response where relevant;
+- look for technically valid but visually underdeveloped regions;
+- record only the highest-value bounded quality-gain issues allowed by the current
+  project policy.
+
+A GUI `REVISE` goes through Change Impact. Do not jump straight to hand edits.
+Never downgrade `BROKEN` or `UNKNOWN` GUI capability to `UNAVAILABLE`.
 
 ## Operate by current state
 
-Always read `blendsmith status --project <project>` and advance only through the
-operation accepted by the current Core state. Typical responsibilities are:
+Prefer `blendsmith next --project <project>` over guessing internal paths or IDs.
+Typical states:
 
-- `AWAITING_METHOD_PLAN`: decompose the requested work into concrete work units.
-  Query `blendsmith method-hints --project <project> --intent <intent>` for known
-  dedicated Blender methods and validate the plan against
-  `blendsmith schema method_plan`. After submitting it, read
-  `metadata.method_plan_sha256` from the Core result or a fresh `blendsmith status`.
-  Use that exact Core-issued SHA in the method-selection contract; do not hash the
-  local input JSON yourself because Core stores the authoritative normalized plan.
-- `AWAITING_METHOD_SELECTION`: inspect/probe Blender native functions, Geometry
-  Node tools, asset libraries, installed extensions, project catalogs, and
-  configured adapters as required by project policy. Validate against
-  `blendsmith schema method_selection`. Prefer a viable specialized method;
-  scratch/general-purpose construction is a fallback only after specialized
-  options are accounted for and exhausted.
-- `WORKING`: perform the Blender work with the best available Blender/MCP/bpy/GUI
-  capability. Ingest each candidate with `candidate-add` or select an existing
-  active-iteration candidate with `candidate-select`.
-- Evidence/review states: render and actually inspect the required evidence,
-  submit contracts matching the current schemas, and do not claim visual review
-  from file existence or machine checks alone.
-- `AWAITING_FIX_PLAN`: keep repair bounded and address the review-selected issues.
-- A visual `METHOD_RECONSIDERATION` means the production method itself was wrong;
-  return through BlendSmith's method-selection flow instead of endlessly patching
-  the existing geometry.
-- `AWAITING_LIVE_GUI_REVIEW`: perform real Blender GUI inspection when required
-  and available. Never downgrade `BROKEN` or `UNKNOWN` to `UNAVAILABLE`.
-- `FINAL_AI_VALIDATION`: run `blendsmith ai-accept --project <project>` only after
-  all current gates are satisfied.
-- `OWNER_REVIEW`: stop and present the candidate/evidence to the owner. Wait for
-  an explicit `ACCEPT`, revision request, or run rejection.
-- `OWNER_ACTION_REQUIRED`: stop automatic progress and surface the recorded owner
-  action instead of improvising around the failure.
+- `AWAITING_METHOD_PLAN`: author the dependency-aware Method Plan.
+- `AWAITING_METHOD_SELECTION`: probe or reuse valid discovery facts and submit the
+  current Method Selection contract.
+- `WORKING`: perform authorized Blender work and ingest/select a candidate.
+- `RENDERING_EVIDENCE`: generate and submit required evidence.
+- `AWAITING_VISUAL_REVIEW`: actually open and inspect evidence, then submit review.
+- `AWAITING_CHANGE_IMPACT`: classify the requested change before editing.
+- `AWAITING_GLOBAL_REASSESSMENT`: reassess the whole active production decision.
+- `AWAITING_FIX_PLAN`: keep repair bounded and preserve required methods.
+- `AWAITING_LIVE_GUI_REVIEW`: perform exploratory Blender GUI inspection.
+- `FINAL_AI_VALIDATION`: run `blendsmith ai-accept` only after all gates pass.
+- `OWNER_REVIEW`: stop and present the exact candidate/evidence to the owner.
+- `OWNER_ACTION_REQUIRED`: stop. Resolve the recorded condition. For a supported
+  live-GUI capability failure, reprobe explicitly and then use
+  `blendsmith owner-action-recover --project <project>`; do not create a new run
+  merely to escape the gate.
 
-When interrupted, prefer `blendsmith checkpoint` and resume through
-`blendsmith resume`; do not recreate lost authority state from memory.
+When interrupted, prefer `blendsmith checkpoint` and `blendsmith resume`; do not
+recreate lost authority from conversational memory.
 
 ## Blender operation
 
-BlendSmith decides and verifies the production lifecycle; it does not replace the
-actual Blender operator. Use the best available host capability for execution:
-Blender MCP, bpy/headless Blender, direct GUI/computer use, reusable assets,
-Geometry Nodes, modifiers, or installed extensions.
+BlendSmith verifies the production lifecycle; it does not replace the actual
+Blender operator. Use the best available host capability: Blender MCP,
+`bpy`/headless Blender, direct GUI/computer use, reusable assets, Geometry Nodes,
+modifiers, or installed extensions.
 
-For visual/spatial failures, inspect Blender or rendered evidence directly. For
-reproducible setup and structural validation, prefer scripts/contracts that can be
-rerun. Keep accepted artifact bytes and authority boundaries under BlendSmith Core.
+For reproducible setup and structural validation, prefer scripts/contracts that
+can be rerun. For visual/spatial quality, inspect render evidence and the live GUI
+directly. Keep accepted artifact bytes and authority boundaries under BlendSmith
+Core.
 
 ## Completion
 

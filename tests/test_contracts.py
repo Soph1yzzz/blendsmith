@@ -33,7 +33,10 @@ def test_gui_pass_requires_concrete_checks() -> None:
         "blend_path_verified": False,
         "dirty_state_checked": True,
         "viewport_interaction_performed": True,
-        "views_observed": ["orbit"],
+        "exploration_actions": ["ORBIT", "ZOOM", "UNSEEN_ANGLE"],
+        "coverage": ["OVERALL_FORM", "THICKNESS_DEPTH", "HIDDEN_SURFACES"],
+        "views_observed": ["front", "rear oblique", "underside"],
+        "observations": ["Observed full form.", "Observed hidden surfaces."],
         "issues": [],
     }
     with pytest.raises(ContractError):
@@ -77,6 +80,7 @@ def test_fix_plan_is_bounded_to_two_primary_issues() -> None:
         "candidate_id": "candidate-1",
         "candidate_sha256": SHA,
         "primary_issue_ids": ["1", "2", "3"],
+        "method_ids_to_preserve": ["modifier.mirror"],
         "steps": ["fix"],
         "expected_acceptance_tests": ["pass"],
     }
@@ -84,7 +88,7 @@ def test_fix_plan_is_bounded_to_two_primary_issues() -> None:
         validate_contract("fix_plan", payload)
 
 
-def test_visual_revise_requires_explicit_revision_strategy() -> None:
+def test_visual_revise_requires_at_least_one_issue() -> None:
     payload = {
         "schema_version": 1,
         "run_id": "run-1",
@@ -100,6 +104,22 @@ def test_visual_revise_requires_explicit_revision_strategy() -> None:
     }
     with pytest.raises(ContractError):
         validate_contract("visual_review", payload)
+
+
+def test_global_reassessment_requires_whole_production_context() -> None:
+    payload = {
+        "schema_version": 1,
+        "run_id": "run-1",
+        "candidate_id": "candidate-1",
+        "candidate_sha256": SHA,
+        "decision": "CONTINUE_LOCAL",
+        "reviewed_context": ["METHOD_PLAN", "METHOD_SELECTION", "CANDIDATE", "OPEN_ISSUES"],
+        "rationale": "Local repair still appears viable.",
+        "affected_work_units": ["shape"],
+    }
+    with pytest.raises(ContractError, match="whole production context"):
+        validate_contract("global_reassessment", payload)
+
 
 
 def test_invalid_state_transition_is_rejected() -> None:

@@ -27,6 +27,8 @@ Candidate metadata, method contracts, checkpoint metadata, retention records, an
 
 Configured discovery sources must be accounted for before production begins. A required discovery source left `BROKEN`/`UNKNOWN`, or a relevant specialized method left `UNKNOWN`, blocks method selection rather than silently authorizing a general-purpose/scratch fallback.
 
+v0.0.2 also separates cached discovery evidence from selection authority. Cache identity is environment-bound, only sources with a Core-owned freshness boundary may be reused, and later candidate operations revalidate the same current cache fingerprint semantics. Project catalogs, adapters, external Node Tools, or other sources without a safe freshness proof must be checked again rather than treated as authoritative cached facts.
+
 External agents provide probe evidence through structured contracts; BlendSmith validates the policy and identity bindings but cannot cryptographically prove that a remote/model-produced observation was truthful. Hosts should use real Blender/tool inspection for discovery evidence rather than model memory alone.
 
 ## Capability safety
@@ -34,6 +36,8 @@ External agents provide probe evidence through structured contracts; BlendSmith 
 `AVAILABLE`, `UNAVAILABLE`, `BROKEN`, and `UNKNOWN` have distinct meanings. `BROKEN` and `UNKNOWN` cannot be treated as `UNAVAILABLE` to bypass required GUI review.
 
 Capability snapshots are validated contracts. Blender runtime probing is bounded to one initial attempt plus at most three retries when the probe is broken. Host-provided capability observations should come from a trusted host/owner integration; autonomous agents should not fabricate capability states to bypass QA.
+
+Same-run recovery from a supported GUI owner-action failure requires a newer explicit capability observation than the recorded failure. Old snapshots, non-explicit observations, `BROKEN`, and `UNKNOWN` cannot authorize recovery.
 
 ## Retry safety
 
@@ -57,7 +61,7 @@ The bundled Codex Skill is installed only to the fixed user Skill location under
 
 ## Concurrent writers
 
-BlendSmith uses atomic JSON replacement for authoritative JSON state, but v0.0.1 is designed for a single active writer per project. A hostile process that can continuously mutate files between verification and filesystem operations is outside the protection boundary. Run one BlendSmith orchestrator per project at a time.
+BlendSmith uses atomic JSON replacement for authoritative JSON state, but the current design assumes a single active writer per project. A hostile process that can continuously mutate files between verification and filesystem operations is outside the protection boundary. Run one BlendSmith orchestrator per project at a time.
 
 ## Reporting security issues
 

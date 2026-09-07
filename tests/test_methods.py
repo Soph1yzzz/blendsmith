@@ -12,8 +12,20 @@ from blendsmith.project import DEFAULT_CONFIG
 def _run() -> dict:
     return {
         "run_id": "run-1",
-        "metadata": {"method_selection_round": 0},
+        "metadata": {"method_selection_round": 0, "method_plan_revision": 0},
     }
+
+
+def _family_checks(*applicable: str) -> list[dict]:
+    applicable_set = set(applicable)
+    return [
+        {
+            "intent": family["intent"],
+            "status": "APPLICABLE" if family["intent"] in applicable_set else "NOT_APPLICABLE",
+            "evidence": [f"decomposition:{family['intent']}"],
+        }
+        for family in load_method_hints()["families"]
+    ]
 
 
 def _plan() -> dict:
@@ -21,8 +33,26 @@ def _plan() -> dict:
         "schema_version": 1,
         "run_id": "run-1",
         "plan_id": "plan-1",
+        "revision": 0,
+        "supersedes_sha256": None,
+        "revision_reason": None,
         "work_units": [
-            {"work_unit_id": "tree", "intent": "tree_generation", "requirements": ["realistic"]}
+            {
+                "work_unit_id": "tree",
+                "intent": "tree generation",
+                "requirements": ["realistic"],
+                "rationale": "The tree is a distinct production responsibility.",
+                "stage": "geometry",
+                "depends_on": [],
+                "method_family_checks": _family_checks("tree_generation"),
+                "method_operations": [
+                    {
+                        "operation_id": "tree.generate",
+                        "intent": "tree_generation",
+                        "requirements": ["realistic"],
+                    }
+                ],
+            }
         ],
     }
 
@@ -94,6 +124,7 @@ def _payload(
         "selections": [
             {
                 "work_unit_id": "tree",
+                "operation_id": "tree.generate",
                 "specialized_search_complete": True,
                 "candidate_methods": methods,
                 "selected_method_id": selected,
@@ -122,7 +153,7 @@ def test_scratch_is_rejected_when_viable_specialized_method_exists() -> None:
         ],
         "scratch.mesh",
     )
-    with pytest.raises(ContractError, match="viable specialized"):
+    with pytest.raises(ContractError, match="FULL specialized"):
         validate_method_selection(payload, run=_run(), plan=_plan(), project_config=_config())
 
 
@@ -188,14 +219,50 @@ def test_scratch_is_allowed_after_specialized_options_are_exhausted() -> None:
 def test_selection_must_cover_every_work_unit_exactly_once() -> None:
     plan = _plan()
     plan["work_units"].append(
-        {"work_unit_id": "grass", "intent": "surface_scatter", "requirements": ["dense"]}
+        {
+            "work_unit_id": "grass",
+            "intent": "grass scatter",
+            "requirements": ["dense"],
+            "rationale": "Grass scattering is independent of tree generation.",
+            "stage": "detail",
+            "depends_on": [],
+            "method_family_checks": _family_checks("surface_scatter"),
+            "method_operations": [
+                {
+                    "operation_id": "grass.scatter",
+                    "intent": "surface_scatter",
+                    "requirements": ["dense"],
+                }
+            ],
+        }
     )
     payload = _payload(
         [_method("tree.generator", kind="SPECIALIZED", availability="AVAILABLE", fit="FULL")],
         "tree.generator",
     )
-    with pytest.raises(ContractError, match="do not match work plan"):
+    with pytest.raises(ContractError, match="do not match planned operations"):
         validate_method_selection(payload, run=_run(), plan=plan, project_config=_config())
+
+
+def test_method_plan_requires_every_known_method_family_to_be_accounted_for() -> None:
+    plan = _plan()
+    plan["work_units"][0]["method_family_checks"] = [
+        check
+        for check in plan["work_units"][0]["method_family_checks"]
+        if check["intent"] != "symmetry"
+    ]
+    with pytest.raises(ContractError, match="account for every known method family"):
+        validate_method_plan(plan, run=_run())
+
+
+def test_applicable_method_family_requires_matching_operation() -> None:
+    plan = _plan()
+    symmetry = next(
+        check for check in plan["work_units"][0]["method_family_checks"] if check["intent"] == "symmetry"
+    )
+    symmetry["status"] = "APPLICABLE"
+    with pytest.raises(ContractError, match="has no matching method operation"):
+        validate_method_plan(plan, run=_run())
 
 
 def test_method_plan_rejects_duplicate_work_units() -> None:
@@ -203,6 +270,37 @@ def test_method_plan_rejects_duplicate_work_units() -> None:
     plan["work_units"].append(dict(plan["work_units"][0]))
     with pytest.raises(ContractError, match="must be unique"):
         validate_method_plan(plan, run=_run())
+
+
+def test_general_full_can_displace_specialized_partial_only_with_evidence_backed_waiver() -> None:
+    payload = _payload(
+        [
+            _method(
+                "tree_generator.extension",
+                kind="SPECIALIZED",
+                availability="AVAILABLE",
+                fit="PARTIAL_LOCAL_REFINEMENT",
+                source="EXTENSION",
+            ),
+            _method(
+                "general.native",
+                kind="GENERAL_PURPOSE",
+                availability="AVAILABLE",
+                fit="FULL",
+                source="CUSTOM",
+            ),
+        ],
+        "general.native",
+    )
+    with pytest.raises(ContractError, match="evidence-backed waiver"):
+        validate_method_selection(payload, run=_run(), plan=_plan(), project_config=_config())
+
+    payload["selections"][0]["specialized_waiver"] = {
+        "reason": "The specialized method leaves unbounded refinement while the general method is a full fit.",
+        "evidence": ["Probe comparison recorded both requirement fits."],
+    }
+    validate_method_selection(payload, run=_run(), plan=_plan(), project_config=_config())
+
 
 
 def test_partial_specialized_method_requires_bounded_manual_work() -> None:

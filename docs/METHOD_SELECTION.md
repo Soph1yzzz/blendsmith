@@ -1,54 +1,48 @@
 # Method Selection Gate
 
-BlendSmith treats **knowing that a Blender feature exists** and **choosing the best available production method for the current work unit** as separate problems.
+BlendSmith treats **knowing that a Blender feature exists**, **decomposing work so the feature is visible to the planner**, and **choosing the best available production method** as separate problems.
 
-The gate exists to prevent an agent from immediately building geometry from scratch when a dedicated Blender feature, reusable node tool, asset, extension, adapter, or project-local generator can satisfy the requirement more directly.
+v0.0.2 therefore puts Method Selection behind a Work Unit Decomposition Gate.
 
 ## Core rule
 
 **Specialized first, scratch last.**
 
-For every work unit, BlendSmith requires the agent to:
+But v0.0.2 applies that rule per method-selectable operation, not merely per broad work unit.
 
-1. identify the production intent and concrete requirements;
-2. inspect the configured discovery sources;
-3. probe candidate methods instead of relying on model memory alone;
-4. prefer an available specialized method when it fully satisfies the requirements or can satisfy them with bounded local refinement;
-5. use a general-purpose or scratch method only when specialized options are unavailable, broken, or insufficient for the stated requirements;
-6. record only the execution decision/evidence needed to validate the choice. BlendSmith does not require private chain-of-thought or a detailed reasoning log.
+## 1. Decompose before selecting
 
-A typical tree work unit therefore prefers an installed tree generator, reusable Geometry Nodes/Node Tool asset, or suitable asset-library method before manual trunk/branch construction. The generated result may still be refined locally.
+Every work unit must include rationale, stage, dependencies, method-family checks, and one or more method operations.
 
-## Work-unit flow
+For every built-in method family, the plan must record:
 
-```text
-BLENDER_PREFLIGHT
- -> AWAITING_METHOD_PLAN
- -> METHOD_PLAN_VALIDATED
- -> AWAITING_METHOD_SELECTION
- -> METHOD_SELECTION_VALIDATED
- -> WORKING
- -> candidate ingest
- -> evidence / visual QA
-```
+- `APPLICABLE`, or
+- `NOT_APPLICABLE`
 
-A method plan decomposes the requested production work into independently selectable units, for example `tree_generation`, `surface_scatter`, `symmetry`, or `thickness`.
+with evidence.
 
-After `method-plan` is accepted, the Core stores a normalized authoritative plan and exposes its SHA-256 as `metadata.method_plan_sha256` in the run state. The next method-selection contract must use that Core-issued SHA; callers should not hash their local input JSON because formatting/encoding may differ from the normalized authoritative bytes.
+If `symmetry` is `APPLICABLE`, a matching `symmetry` operation must exist. An agent cannot submit one broad operation such as `build_sword` and silently hide symmetry, repetition, thickness, or edge-rounding work inside it.
 
-The selection contract is model-independent. For each work unit it records:
+The Method Plan is also the dependency-aware Production Graph. Unknown dependencies, self-dependencies, duplicate operation IDs, and graph cycles are rejected.
 
-- methods considered;
-- source type;
-- runtime availability (`AVAILABLE`, `UNAVAILABLE`, `BROKEN`, `UNKNOWN`);
-- requirement fit (`FULL`, `PARTIAL_LOCAL_REFINEMENT`, `INSUFFICIENT`, `UNKNOWN`);
-- probe evidence;
-- selected method;
-- remaining bounded manual work.
+## 2. Probe methods for every operation
+
+For each method operation, the selection contract records:
+
+- candidate methods
+- source type
+- runtime availability (`AVAILABLE`, `UNAVAILABLE`, `BROKEN`, `UNKNOWN`)
+- requirement fit (`FULL`, `PARTIAL_LOCAL_REFINEMENT`, `INSUFFICIENT`, `UNKNOWN`)
+- probe evidence
+- selected method
+- bounded remaining manual work when applicable
+- an evidence-backed specialized waiver when policy requires one
+
+The contract records execution evidence only. BlendSmith does not require private chain-of-thought or a model-specific reasoning log.
 
 ## Discovery sources
 
-The default policy expects these sources to be accounted for:
+The default policy expects these sources to be explicitly settled:
 
 - `BLENDER_NATIVE`
 - `GEOMETRY_NODE_TOOLS`
@@ -57,39 +51,84 @@ The default policy expects these sources to be accounted for:
 - `PROJECT_CATALOG`
 - `ADAPTERS`
 
-A source may be explicitly `UNAVAILABLE`. A required source left `BROKEN` or `UNKNOWN` blocks method selection because the missing information could conceal a more suitable specialized method.
+A source may be explicitly `UNAVAILABLE`. A required source left `BROKEN` or `UNKNOWN` blocks selection because the missing information may conceal a more suitable specialized method.
 
-Project profiles may change the required source set, but the policy remains explicit and machine-validated.
+Known method hints from the provider-neutral catalog must also be explicitly represented when relevant.
 
-## Fallback rules
+## Method Selection Policy v2
 
-Selecting `GENERAL_PURPOSE` or `SCRATCH` is rejected when any considered `SPECIALIZED` method is both:
+### Specialized + FULL
 
-- `AVAILABLE`; and
-- `FULL` or `PARTIAL_LOCAL_REFINEMENT` fit.
+An `AVAILABLE` specialized method with `FULL` requirement fit normally blocks general-purpose and scratch fallback.
 
-Any selection is blocked while a relevant specialized method remains `UNKNOWN` or while a required discovery source remains `BROKEN`/`UNKNOWN`. Fallback therefore happens only after the specialized search is settled.
+### Specialized + PARTIAL_LOCAL_REFINEMENT
 
-This does not ban custom modeling. It makes custom modeling the explicit fallback when dedicated methods genuinely cannot satisfy the work unit.
+A partial specialized method remains viable. If it is selected, the contract must record bounded `remaining_manual_work`.
 
-## Method mismatch during visual QA
+A `GENERAL_PURPOSE + FULL` method may be selected over `SPECIALIZED + PARTIAL_LOCAL_REFINEMENT`, but only with an explicit evidence-backed waiver explaining why the full-fit general method is the better production choice.
 
-A visual problem can be either a local defect or a method-selection defect.
+### Scratch
+
+`SCRATCH` is the final fallback. It is rejected while a viable specialized or general-purpose method exists.
+
+### Unknowns
+
+A relevant specialized candidate left unresolved, or a required discovery source left `BROKEN` / `UNKNOWN`, blocks fallback.
+
+## Discovery cache
+
+Method discovery can be expensive, but cached discovery must not become stale authority.
+
+BlendSmith therefore caches **discovery facts only**. The cache:
+
+- is bound to a Core-owned environment/catalog/version/epoch fingerprint;
+- is not Method Selection authority;
+- is accepted only for sources whose freshness Core can prove;
+- does not remove the requirement to re-evaluate the current operation requirements;
+- is revalidated again when later candidate work depends on that selection.
+
+Sources without a Core-owned freshness fingerprint are checked again instead of receiving a convenient cache hit.
+
+## Method continuity during repair
+
+A `LOCAL` Change Impact decision means the plan and selected method remain valid.
+
+Before a local Fix Plan is accepted, BlendSmith resolves all methods selected for the affected work units. The Fix Plan must preserve that exact method set.
+
+This prevents a repair from quietly abandoning `Mirror`, `Array`, Geometry Nodes, or another validated method and recreating the same behavior by hand.
+
+## Method reconsideration
+
+When Change Impact classifies a problem as `METHOD`, the current candidate is invalidated and the run returns through Method Selection before more production is authorized.
 
 ```text
-VISUAL_REVIEW_VALIDATED
- ├─ LOCAL_REPAIR
- │    -> AWAITING_FIX_PLAN
- │
- └─ METHOD_RECONSIDERATION
-      -> METHOD_RECONSIDERATION
-      -> AWAITING_METHOD_SELECTION
-      -> METHOD_SELECTION_VALIDATED
-      -> WORKING
+AWAITING_CHANGE_IMPACT
+-> CHANGE_IMPACT_VALIDATED
+-> METHOD_RECONSIDERATION
+-> AWAITING_METHOD_SELECTION
+-> METHOD_SELECTION_VALIDATED
+-> WORKING
 ```
 
-`METHOD_RECONSIDERATION` starts a new improvement iteration, clears the active candidate, and requires a new method selection before another candidate can be reviewed. The original work plan remains the authority unless the run is explicitly restarted with different requirements.
+The run may also reach Method Selection after Global Reassessment chooses `RESELECT_METHOD`.
+
+## Upstream structure/contract revision
+
+`STRUCTURAL` and `CONTRACT` changes do not belong in Method Selection alone. They return to `AWAITING_METHOD_PLAN`, where a new plan revision must explicitly supersede the exact previous plan SHA. Affected downstream graph nodes are invalidated before another Method Selection round.
 
 ## Default method hints
 
-BlendSmith ships a small provider-neutral hint catalog for common Blender operations such as symmetry, repetition, thickness, surface scattering, lathe/revolve work, hair, and tree generation. When a work-unit intent matches this catalog, every known hint must be explicitly accounted for in the method-selection contract; an agent cannot silently omit a known dedicated method and jump to scratch modeling. Hints are not claims that a method is installed or compatible: each hinted method still needs an explicit availability/fit result and probe evidence.
+BlendSmith ships a small provider-neutral catalog for common operations, including:
+
+```text
+symmetry        -> Mirror
+repetition      -> Array / Geometry Nodes
+surface scatter -> Geometry Nodes
+thickness       -> Solidify
+lathe / revolve -> Screw
+edge rounding   -> Bevel
+hair            -> Geometry Nodes / Node Tool
+tree generation -> extension / Node Tool / asset-library discovery
+```
+
+Hints are discovery targets, not claims that a method is installed or suitable. Availability and fit still require explicit evidence.

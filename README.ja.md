@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="docs/assets/blendsmith-readme-hero.png" alt="BlendSmith — AI支援Blender制作のためのプロダクションループハーネス" width="100%">
+  <img src="docs/assets/blendsmith-readme-hero.png" alt="BlendSmith — AI支援Blender制作のためのプロダクションコントロールループ" width="100%">
 </p>
 
 <h1 align="center">BlendSmith</h1>
 
-<p align="center"><strong>AI支援Blender制作を、制作・検証・修正・承認まで一つのループで管理するハーネス。</strong></p>
-<p align="center">方法を選ぶ。実物を見る。必要なところだけ直す。最後は人間が決める。</p>
+<p align="center"><strong>AIにBlenderをやらせるなら、まずこれを挟めばいい。</strong></p>
+<p align="center">強いモデルはもう作れる。BlendSmithは、作り方を崩させない。</p>
 
 <p align="center">
   <a href="https://github.com/Soph1yzzz/blendsmith/releases/latest"><img src="https://img.shields.io/github/v/release/Soph1yzzz/blendsmith?style=flat-square&label=release" alt="Latest release"></a>
@@ -24,19 +24,32 @@
   <strong><a href="docs/ROADMAP.md">ロードマップ</a></strong>
 </p>
 
-BlendSmithは、Blenderを扱うAIエージェント向けの**モデル非依存ループハーネス**です。
+AIにBlenderを本気でやらせるなら、プロンプトだけ渡して「あとは賢くやって」で終わらせない。**BlendSmithを噛ませる。**
 
-モデルやBlender、MCP、`bpy`、GUI操作そのものを置き換えるものではありません。制作の前後にある、方法選択、候補管理、画像での確認、修正、チェックポイント、人間の承認、保存と公開までをCore側の状態として管理します。
+BlendSmithは、Blenderを扱うAIエージェント向けの**モデル非依存プロダクションコントロールループ**です。モデルやBlender、MCP、`bpy`、GUI操作そのものを置き換えるものではありません。仕事を分解し、専用機能を先に検討し、作業同士の依存関係を持たせ、renderとGUIの両方で確認し、問題が起きたら正しい階層まで戻す。その制作判断をCore側で管理します。
 
-GPT-6 Astraの登場で、モデル単体でもかなり印象的な3Dアセットを作れるようになりました。ただ、**作れることと、毎回適切なBlender機能を選び、結果を確認し、失敗から安全に戻り、レビュー済みの成果物を人間へ渡せることは別の問題**です。BlendSmithは、その周辺を受け持ちます。
+大事なのは、**「問題が見えた場所」と「判断を間違えた場所」は同じとは限らない**ことです。見えている不具合は小さくても、原因が作り方にあるならMethod Selectionへ戻す。構造にあるならProduction Graphまで戻す。要求そのものが違うなら上流の契約を更新する。局所修正を積み続ける前に、戻る場所を決めます。
+
+これは弱いモデルを補うための道具ではありません。強いモデルは、もうかなりの3Dを作れます。**BlendSmithは、その能力を長い制作の中で崩さず使い切るための制御層です。**
+
+> 賢さはモデルに任せる。制作の筋道はBlendSmithに守らせる。出力がおかしいなら「もう一回やって」で済ませず、判断を間違えた階層まで戻す。
 
 ## このワークフローでどこまで作れるか
 
-BlendSmithの元になったローカルハーネスは、GPT-5.6 Sol Highの時点で実際のBlender制作に使っていました。
+私はBlenderも3Dも初心者です。これは、Blenderに慣れた作者が横から細かく直し続けて出した制作例ではありません。
 
-<p align="center">
-  <img src="assets/examples/gothic-interior.png" alt="AI支援で制作したゴシック建築内装" width="100%">
-</p>
+少なくとも私の実制作では、**GPT-5.6 Solをほぼ素のままBlenderに向かわせたときの結果はかなり弱く、専用機能の選び方や見直し方も安定しませんでした。** そこで、方法選択、証拠確認、修正、再選択、承認までをHarnessとして外に出し、モデルに制作ループを与えました。
+
+すると、同じGPT-5.6 Solでもここまで出せるようになりました。
+
+<table>
+  <tr>
+    <td align="center"><img src="assets/examples/gothic-interior.png" alt="AI支援で制作したゴシック建築内装" width="100%"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>ゴシック建築 / 大規模内装</b></td>
+  </tr>
+</table>
 
 <table>
   <tr>
@@ -49,11 +62,19 @@ BlendSmithの元になったローカルハーネスは、GPT-5.6 Sol Highの時
   </tr>
 </table>
 
-出力品質は、使うモデル、参考画像、Blender側で利用できる機能、何回見直すかによって変わります。BlendSmithが担当するのは作品そのものではなく、**作品を作って確認し、必要なら直す流れ**です。
+だからBlendSmithの出発点は、**「AIに3Dを作らせる」ことではありません。もう作れるモデルを、長い制作の中でどう崩さないか**です。
 
-### 現行世代でも役割は残った
+正しいmethodを選び続けられるか。局所修正では済まない問題に気づけるか。固定renderで見逃した違和感まで拾えるか。間違えたら、どの階層まで戻るべきか。BlendSmithはそこを受け持ちます。
 
-GPT-6 Astraを使った軽い内部テストでは、モデル自身が候補を作り、前の版を見直して修正するところまで進められました。その状態でも、BlendSmithによる方法探索、候補ファイルのSHA固定、6方向の証跡、Blender GUIでの最終確認、`OWNER_REVIEW`での停止は有用でした。
+出力品質は、使うモデル、参考画像、Blender側で利用できる機能、何回見直すかによって変わります。ただ、強いモデルとBlenderを操作できる環境があるなら、**その間にBlendSmithを入れて制作ループを任せる**という使い方ができます。
+
+### 現行世代でも同じ方向の効果を確認した
+
+これは定量ベンチマークではなく、作者自身の実制作で得た比較です。ただ、GPT-5.6 Solで見えた差は、より強いGPT-6 Astraでも完全には消えませんでした。
+
+GPT-6 Astraを使った小規模な内部テストでは、モデル自身が候補を作り、前の版を見直して修正するところまで進められました。それでも、BlendSmithを通すことで方法探索、候補ファイルのSHA固定、6方向の証跡、Blender GUIでの探索確認、`OWNER_REVIEW`での停止までが一つの制作ループとして残りました。
+
+**モデルが強くなっても、制作ループを外から持たせる効果は残る。** 少なくとも今回の小規模dogfoodでは、GPT-5.6 Solで得たのと同じ方向の効果を確認できました。
 
 <p align="center">
   <img src="docs/assets/blendsmith-astra-dogfood.png" alt="GPT-6 AstraでのBlendSmith内部テスト" width="100%">
@@ -61,38 +82,67 @@ GPT-6 Astraを使った軽い内部テストでは、モデル自身が候補を
 
 ## 制作を一周させる
 
-AIで3Dを作るとき、生成だけを独立した作業にすると「とりあえず作った」「見た感じ良さそう」で終わりやすくなります。BlendSmithでは、制作、確認、修正、再選択、承認を同じループに入れます。
+v0.0.2では、単純な「確認して、悪ければ直す」から一段進めました。修正に入る前に、**どの階層の判断を直すべきか**を決めます。
 
-<p align="center">
-  <img src="docs/assets/blendsmith-control-loop.png" alt="BlendSmithの制作コントロールループ" width="100%">
-</p>
+```text
+要求
+  -> 作業を分解
+  -> Production Graph
+  -> 既知のmethod familyを一通り確認
+  -> Method Selection
+  -> Blenderで制作
+  -> candidateを固定
+  -> render evidence
+  -> Visual Review
+       -> 問題・改善点あり
+            -> Change Impact Gate
+                 -> LOCAL      -> methodを維持 -> Fix Plan
+                 -> METHOD     -> Method Selectionへ戻る
+                 -> STRUCTURAL -> Production Graph / Method Planを更新
+                 -> CONTRACT   -> 上流の要求・Planを更新
+       -> Render側は合格
+            -> Exploratory Live GUI Review
+                 -> 回す / 寄る / 裏を見る / 厚みを見る
+                 -> REVISE -> Change Impact Gateへ戻る
+                 -> PASS   -> 最終AI検証
+  -> AI_ACCEPTED
+  -> OWNER_REVIEW
+```
 
-レビュー後の進み方も分けています。
+`LOCAL`が続いたときは、途中で**Global Reassessment**を挟めます。Method Plan、Production Graph、Method Selection、現在のcandidate、未解決issue、修正履歴まで見直したうえで、「本当にもう一回だけ局所修正でいいのか」を決め直します。
 
-- **局所修正** — 方法は合っている。問題になっている箇所だけ直して、もう一度確認する。
-- **方法の再選択** — そもそもの作り方が悪い。同じ方法を継ぎ足し続けず、Method Selectionへ戻る。
-- **AI側の合格** — 自動検証は通った。ここから先は人間の判断待ち。
+戻り先は4種類です。
 
-最後は意図的にここで止まります。
+- **LOCAL** — 計画と方法は合っている。選択済みmethodを維持したまま、問題箇所だけ直す。
+- **METHOD** — 作り方が悪い。手作業で継ぎ足さずMethod Selectionへ戻す。
+- **STRUCTURAL** — 作業同士の依存関係が悪い。Production Graphを更新し、影響する下流作業を古いものとして扱う。
+- **CONTRACT** — そもそもの要求や設計判断が違う。実装だけこっそり変えず、上流Planを新しいrevisionとして作り直す。
+
+GUI確認も、最後に一度開いてPASSを付けるだけにはしません。使える環境なら、固定renderでは見えにくい**厚み、接続、裏側、装飾密度、materialの見え方、回したときだけ出る違和感**を探しにいきます。
+
+最後は今まで通り、意図的にここで止まります。
 
 ```text
 AI_ACCEPTED != HUMAN_ACCEPTED
 ```
 
-エージェントは「進めたい」と提案できます。状態遷移が正しいかはBlendSmith Coreが判断し、レビュー済みのそのファイルを最終的に受け取るかどうかはOwnerが決めます。
+エージェントは次の操作を提案できますが、状態遷移を許可するのはBlendSmith Coreです。レビュー済みのそのcandidateを受け取るかどうかはOwnerが決めます。
 
-## BlendSmithが止めたい失敗
+## モデル単体でよくない？
 
 | よくある状態 | BlendSmithでの扱い |
 | --- | --- |
-| Blenderに専用機能があるのに、モデルが思い出さず自作を始める | **Method Selection Gate**で制作前に専用手段を確認する |
+| Blenderに専用機能があるのに、モデルが思い出さず自作を始める | **method familyの事前確認 + Method Selection Gate**で、既知の専用手段を制作前に明示的に扱う |
+| 修正時だけMirrorやArrayをやめて手作業へ逃げる | **Method Continuity Gate**で、LOCAL修正中は選択済みmethodを維持する |
+| 見えている不具合は小さいが、原因は上流の設計にある | **Change Impact Gate**でLOCAL / METHOD / STRUCTURAL / CONTRACTを先に決める |
+| 小さな修正を重ねているうちに全体が崩れる | **Global Reassessment**で一度制作全体を見直す |
+| 固定renderは良いのに、回して見ると妙に薄い・浮いている | **Exploratory Live GUI Review**で裏側、厚み、接続、detail、material responseまで見る |
+| 同じ環境なのに毎回method探索をやり直す | **環境に紐づくDiscovery Cache**で、安全に再利用できる事実だけ使い回す |
 | ファイルができた時点で完成扱いする | **Evidence-backed review**で実際の画像を開いて確認する |
-| 作り方を間違えたまま細かい手直しを続ける | **Method reconsideration**で方法選択まで戻る |
 | AIが「良さそう」と言ったので完成にする | AI合格と人間承認を分離する |
 | レビュー後にファイルが変わる | SHA-256でレビュー済みの正確なバイト列を固定する |
-| GUIや外部機能が壊れた | `BROKEN` / `UNKNOWN`を勝手に`UNAVAILABLE`扱いしない |
+| GUIや外部機能が壊れた | `BROKEN` / `UNKNOWN`を勝手に`UNAVAILABLE`扱いせず、復帰時も新しい明示probeを要求する |
 | 長い作業の途中でセッションが切れる | Checkpoint / resumeで検証済み状態から再開する |
-| 中間ファイルが増え続ける | TTLと検証付きGCで対象だけ整理する |
 
 全部のループが成功で終わるとは限りません。直せるなら修正へ戻り、方法が悪ければ再選択し、自動で解けない状態ならOwnerへ返します。止まり方まで状態として残すのがBlendSmithの役目です。
 
@@ -104,7 +154,11 @@ Blenderに`Mirror`や`Array`、Geometry Nodes、アセットライブラリ、�
   <img src="docs/assets/blendsmith-method-selection.png" alt="BlendSmithのspecialized-first方法選択" width="100%">
 </p>
 
-BlendSmithは制作前に作業単位（work unit）へ分け、単位ごとに利用可能な方法を調べます。標準設定では次を確認します。
+BlendSmithは制作前に作業単位（work unit）へ分けます。さらに各work unitで、既知のmethod familyを**APPLICABLE / NOT_APPLICABLE**のどちらかとして一度は明示的に確認します。
+
+たとえば`symmetry`をAPPLICABLEにしたなら、Method Planには`symmetry`のoperationが必要です。「剣を作る」という大きなoperationの中へ左右対称処理まで埋めて、`Mirror`を検討し忘れる形では通りません。
+
+そのうえで利用可能な方法を調べます。標準設定では次を確認します。
 
 - Blender標準機能
 - Geometry Nodes / Node Tool
@@ -115,6 +169,9 @@ BlendSmithは制作前に作業単位（work unit）へ分け、単位ごとに�
 
 既知の候補を無視したまま「見つからなかったこと」にして通すことはありません。必要な探索元や有力な専用方法が`BROKEN` / `UNKNOWN`のままなら、汎用的な作り方へのフォールバックも止めます。
 
+探索結果にはcacheも使えます。ただし、cacheはMethod Selectionそのものの権限にはしません。Core側で鮮度を証明できる範囲だけ再利用し、それ以外のsourceはもう一度確認します。
+
+Method Selection v2では適合度も分けています。`SPECIALIZED + FULL`があるなら原則そちらを優先します。一方、専用methodが`PARTIAL_LOCAL_REFINEMENT`までしか満たせず、汎用methodが`FULL`で満たせる場合は、根拠付きwaiverがあれば汎用methodを選べます。スクラッチは最後です。
 内蔵ヒントの例です。
 
 ```text
@@ -167,18 +224,28 @@ Skillは薄い操作層として作ってあります。状態遷移をプロン
 
 ```text
 preflight
-  -> method plan
-  -> method selection
+  -> Method Plan / Production Graph
+  -> method familyの確認
+  -> Method Selection
   -> Blender production
   -> candidate pin
   -> multi-view evidence
-  -> visual review
-       -> local repair -> production
-       -> method reconsideration -> method selection
-  -> live GUI review when available
+  -> Visual Review
+       -> Change Impact Gate
+            -> LOCAL      -> Method Continuity -> Fix Plan -> production
+            -> METHOD     -> Method Selection
+            -> STRUCTURAL -> 上流Graph / Planを更新
+            -> CONTRACT   -> 上流Contract / Planを更新
+       -> render accepted
+            -> Exploratory Live GUI Review
+                 -> REVISE -> Change Impact Gate
+                 -> PASS
+  -> final AI validation
   -> AI_ACCEPTED
   -> OWNER_REVIEW
 ```
+
+LOCAL修正が続いたときは、次の修正へ入る前にGlobal Reassessmentを挟めます。
 
 `OWNER_REVIEW`に入ると自動進行は止まります。
 
@@ -214,14 +281,19 @@ blendsmith schema visual_review
 主なライフサイクルコマンド:
 
 ```bash
+blendsmith next --project <project>
 blendsmith method-hints --project <project> --intent symmetry
+blendsmith method-cache --project <project> --intent symmetry
 blendsmith method-plan --project <project> --input method_plan.json
 blendsmith method-select --project <project> --input method_selection.json
 blendsmith candidate-add --project <project> --candidate <scene.blend>
 blendsmith evidence-begin --project <project>
 blendsmith evidence-submit --project <project> --view front=<front.png>
 blendsmith visual-review --project <project> --input visual_review.json
+blendsmith change-impact --project <project> --input change_impact.json
+blendsmith global-reassess --project <project> --input global_reassessment.json
 blendsmith gui-review --project <project> --input live_gui_review.json
+blendsmith owner-action-recover --project <project>
 blendsmith ai-accept --project <project>
 blendsmith owner-accept --project <project> --sha256 <candidate_sha256>
 blendsmith checkpoint --project <project>
@@ -235,12 +307,18 @@ CLIが状態遷移を検証するので、エージェントがルールを覚�
 ## Core側で保証すること
 
 - **状態遷移の決定権はCoreに置く。** エージェントは操作を提案し、Coreが現在の状態から許可できるかを判定する。
-- **Specialized first, scratch last.** 要件を満たす専用手段があるなら、汎用構築より先に評価する。
+- **作業分解を曖昧にしない。** 各work unitで既知のmethod familyを一度は明示的に確認する。
+- **Production Graphを状態として持つ。** work unitにはrationale、stage、依存関係を持たせ、上流変更時は影響する下流を古い状態として扱う。
+- **Specialized first, scratch last.** 要件を満たす専用手段を先に評価する。FULLの汎用methodがPARTIALの専用methodを上回るときだけ、根拠付きwaiverを許す。
+- **LOCAL修正でもmethodを勝手に変えない。** Method Continuityで、影響するwork unitの選択済みmethodを維持する。
+- **直す前に変更の深さを決める。** LOCAL / METHOD / STRUCTURAL / CONTRACTで戻り先を分ける。
+- **局所修正を積み上げ続けない。** 必要ならGlobal Reassessmentで制作全体を見直す。
 - **Method PlanからcandidateまでSHAでつなぐ。** candidateはMethod SelectionのSHAを持ち、そのSelectionはMethod PlanのSHAへ結び付く。
-- **検証済みreceiptは後から差し替えられない。** 正規の状態遷移を通さず編集するとintegrity errorになる。
+- **検証済みPlanは上書きしない。** 上流変更は古いSHAを残したまま新revisionとしてsupersedeする。
 - **Evidenceはレビューの実入力。** ファイルが存在するだけでは視覚確認済みにならない。
-- **局所修正と方法再選択を分ける。** 方法が悪いときに、細かいパッチだけで押し切らない。
-- **GUI確認にも具体的な証跡を求める。** path、dirty state、viewport interaction、observed viewsを記録する。
+- **GUIは探索レビューとして使う。** PASSにはorbit、zoom、固定render外の視点、具体的な観察、複数の確認項目を求める。明確なquality gainを見つけたままPASSにはできない。
+- **Owner Actionからの復帰にも新しい証拠が要る。** 同じrunへ戻すときは、failureより後の明示的なcapability probeを要求する。
+- **Discovery Cacheは範囲を限定する。** 鮮度をCoreで証明できないsourceはcache authorityにしない。
 - **人間承認は明示的かつSHA-bound。** Ownerだけが、レビュー済みcandidateの正確なSHAを承認できる。
 - **retryは有限。** retry-safeな操作も初回＋最大3回まで。安全性や整合性に関わる曖昧さはOwnerへ返す。
 - **checkpointでも検証済みの状態を保つ。** Method receiptとcandidate closureを固定し、resume時に再検証する。
@@ -285,9 +363,11 @@ CIはWindows / Ubuntu、Python 3.11 / 3.12で実行しています。
 
 ## 現在の状態
 
-**v0.0.1**が最初の公開版です。モデル非依存のCore/CLIを中心に、Production Loop、Method Selection Gate、画像証跡とVisual Review、局所修正、方法の再選択、Live GUI Review、Owner承認、checkpoint/resume、retention/GC、検証付きローカル公開、Codex Skillまでを含みます。
+現在の公開版は**v0.0.2 — Production Structure**です。
 
-次の**v0.0.2 — Production Structure**では、作業単位の分解、依存関係を持つProduction Graph、Construction Sequence、Structural Integrity、Owner Actionからの安全な復帰、エージェント向けの状態確認機能を進める予定です。詳しくは[ロードマップ](docs/ROADMAP.md)を参照してください。
+元のreview / repair loopに、作業分解、method familyの事前確認、依存関係を持つProduction Graph、Change Impact、Method Continuity、Global Reassessment、探索型GUI Review、安全なsame-run recovery、範囲を限定したDiscovery Cache、Evidence Profile、`next`による状態確認を加えています。
+
+**v0.0.1**は最初の公開版として残しています。
 
 ## ライセンス
 

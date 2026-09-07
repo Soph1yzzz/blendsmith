@@ -1,37 +1,115 @@
-# BlendSmith v0.0.1 Specification
+# BlendSmith v0.0.2 Specification
 
-This is the authoritative public specification for BlendSmith v0.0.1.
+This is the authoritative public specification for BlendSmith v0.0.2.
 
 ## Product boundary
-BlendSmith orchestrates Blender production from method selection through candidate evidence, structured visual review, bounded repair, optional live-GUI verification, explicit owner approval, retention, and verified local publication. The core has no LLM SDK and does not infer capability from model names. A bundled Codex Skill may provide a thin host-facing operating layer, but lifecycle authority remains in the installed BlendSmith CLI/Core.
 
-Out of scope for v0.0.1: CAD workflows, construction sequencing, domain-specific structural logic, provider-specific look-development systems, and game-engine export pipelines.
+BlendSmith is a model-independent production control loop for AI-assisted Blender work. It does not replace the model, Blender, MCP, `bpy`, or GUI automation. The Core owns lifecycle authority around them: work decomposition, method selection, candidate identity, evidence, review, change-impact classification, bounded repair, upstream revision, exploratory GUI review, checkpoint/resume, exact owner approval, retention, and verified publication.
+
+The Core has no LLM SDK and does not infer capability from model names. A bundled Codex Skill may provide a thin host-facing operating layer, but it cannot override Core validation.
+
+Out of scope for v0.0.2: CAD workflows, domain-specific construction sequences, engineering/architecture certification, persistent cross-iteration issue-lineage state, provider-specific look-development systems, and game-engine export pipelines.
 
 ## Authority
+
 `AI_ACCEPTED != HUMAN_ACCEPTED`.
 
-Before owner review, BlendSmith records the candidate SHA-256 and dependency-closure manifest. `ACCEPT` must name that exact SHA-256. If the artifact changes after review, acceptance and publication are blocked. Acceptance metadata is stored separately from the accepted artifact bytes.
+Before owner review, BlendSmith binds the active candidate to its SHA-256 and dependency-closure manifest. `ACCEPT` must name that exact candidate SHA-256. If reviewed bytes or their pinned closure no longer match, acceptance and publication are blocked.
 
 Owner decisions are exactly:
+
 - `ACCEPT`
 - `REQUEST_REVISION`
 - `REJECT_RUN`
 
-A normal "fix this" response is `REQUEST_REVISION`, not `REJECT_RUN`.
+`REQUEST_REVISION` does not authorize an arbitrary direct edit. It enters the same Change Impact Gate used by visual and GUI review so the requested change is classified at the correct abstraction level first.
 
-When revision is requested after acceptance/publication, BlendSmith retracts the current-publication pointer, seeds and pins a replacement generation, demotes the previous final to `EPHEMERAL_SUPERSEDED_FINAL`, applies the configured TTL (24 hours by default), keeps lightweight history, and continues from the new generation.
+If a published result is revised, the current-publication pointer is retracted before the revision loop continues.
 
-## Installation, environment, capability
+## Installation, environment, and capability
+
 Installation lock records BlendSmith version, dependency versions, schema digests, and adapter versions.
 
-Environment lock records static runtime identity such as OS, host Python, Blender executable/version, Blender embedded Python identity when available, and configured adapter/provider identities. Capability results are not part of the environment lock.
+Environment lock records static runtime identity such as OS, host Python, Blender executable/version, and configured runtime identity. Dynamic capability results are stored separately as timestamped snapshots.
 
-Capability is dynamic and stored as timestamped snapshots. States are `AVAILABLE`, `UNAVAILABLE`, `BROKEN`, and `UNKNOWN`. `UNKNOWN` is never treated as `UNAVAILABLE`. A capability that was available and later fails becomes `BROKEN`; it must not be silently downgraded to bypass QA.
+Capability states are:
 
-## Blender support
-Blender 5.2 LTS is the primary v0.0.1 runtime target. Other Blender 5.x versions may proceed when runtime probing reports a compatible environment; this is not an unconditional support guarantee for every 5.x release.
+- `AVAILABLE`
+- `UNAVAILABLE`
+- `BROKEN`
+- `UNKNOWN`
+
+`UNKNOWN` is never treated as `UNAVAILABLE`. A capability that was available and later fails cannot be silently downgraded to bypass a gate.
+
+Blender 5.2 LTS is the primary runtime target. Other Blender 5.x versions may proceed when runtime probing reports a compatible environment; this is not an unconditional support guarantee for every 5.x release.
+
+## Production structure
+
+### Work Unit Decomposition Gate
+
+Before Method Selection, each work unit must carry:
+
+- a stable `work_unit_id`
+- intent and requirements
+- rationale
+- stage
+- dependency edges (`depends_on`)
+- `method_family_checks`
+- one or more method-selectable operations
+
+For every method family in BlendSmith's built-in catalog, each work unit must explicitly record `APPLICABLE` or `NOT_APPLICABLE` with evidence.
+
+If a family is `APPLICABLE`, a matching method operation is required. If it is `NOT_APPLICABLE`, the work unit may not silently include that operation. This prevents a broad task such as "build the sword" from hiding symmetry/repetition/thickness work and skipping dedicated Blender methods.
+
+Work-unit IDs and operation IDs must be unique. Unknown dependencies, self-dependencies, and graph cycles are rejected.
+
+### Production Graph
+
+The Method Plan is also the Production Graph. Dependency edges define which work becomes stale when an upstream structural or contract revision changes affected work units.
+
+Validated Method Plans are immutable by SHA. Upstream changes create a new plan revision that explicitly supersedes the exact previous plan SHA.
+
+## Method Selection Policy v2
+
+The default policy remains:
+
+**Specialized first, scratch last.**
+
+Selection is performed per method operation, not merely per broad work unit.
+
+Required discovery sources are explicitly accounted for. By default these include:
+
+- Blender native functionality
+- Geometry Node tools
+- asset libraries
+- extensions
+- project-local catalogs
+- configured adapters
+
+A required source left `BROKEN` or `UNKNOWN` blocks selection. Relevant specialized candidates left unresolved also block fallback.
+
+Fit policy:
+
+- `SPECIALIZED + FULL` normally blocks general-purpose or scratch fallback.
+- `SPECIALIZED + PARTIAL_LOCAL_REFINEMENT` remains viable and must be evaluated.
+- `GENERAL_PURPOSE + FULL` may displace `SPECIALIZED + PARTIAL_LOCAL_REFINEMENT` only with an explicit evidence-backed waiver.
+- `SCRATCH` is rejected while a viable non-scratch method exists.
+- a selected `PARTIAL_LOCAL_REFINEMENT` method requires bounded `remaining_manual_work`.
+
+Known built-in hints must be explicitly represented in the selection contract when relevant; omission is not a valid route to scratch construction.
+
+### Method Discovery Cache
+
+The cache stores reusable discovery facts, never Method Selection authority.
+
+Cache identity is bound to Core-owned environment/catalog/version/epoch information. v0.0.2 deliberately caches only discovery sources for which Core can prove a freshness boundary. Sources without such a fingerprint must be checked again.
+
+A cached fingerprint written into a selection does not bypass normal Method Selection validation. The same current fingerprint semantics are revalidated when later candidate work relies on that selection.
 
 ## State model
+
+The principal production path is:
+
 ```text
 CREATED
 -> INSTALLATION_PIN_RESOLVED
@@ -47,62 +125,161 @@ CREATED
 -> EVIDENCE_READY
 -> AWAITING_VISUAL_REVIEW
 -> VISUAL_REVIEW_VALIDATED
-   -> AWAITING_FIX_PLAN -> FIX_PLAN_VALIDATED -> WORKING
-   -> RENDER_QA_ACCEPTED
--> LIVE_GUI_DECISION
-   -> AWAITING_LIVE_GUI_REVIEW -> LIVE_GUI_VALIDATED
-   -> FINAL_AI_VALIDATION
--> AI_ACCEPTED
--> OWNER_REVIEW
-   -> REQUEST_REVISION -> OWNER_REVISION_REQUESTED -> NEW_GENERATION_SEEDED -> WORKING
-   -> REJECT_RUN -> OWNER_REJECTED_RUN
-   -> ACCEPT(candidate_sha256) -> HUMAN_ACCEPTED_SHA_LOCKED
--> CURRENT_FINAL_PINNED
--> PUBLICATION_STAGING
--> PUBLISHED
 ```
 
-External-agent work uses explicit waiting states. Returned contracts are validated before advancing.
+A visual `ACCEPT` continues:
 
-## Codex Skill boundary
+```text
+VISUAL_REVIEW_VALIDATED
+-> RENDER_QA_ACCEPTED
+-> LIVE_GUI_DECISION
+```
 
-BlendSmith v0.0.1 includes a bundled Codex Skill for explicit `BlendSmith` invocation. The Skill is not a second specification and must not emulate successful state transitions when the CLI/Core rejects them. Before operating, it requires `blendsmith doctor` to report an on-disk `CURRENT` Skill whose bundled metadata version matches the installed CLI/Core version. It then inspects the current `status`, CLI help, and authoritative schemas exposed by `blendsmith schema <contract>`. A fresh Skill install/update requires a Codex restart because the CLI cannot prove host reload. Owner acceptance remains an explicit human authority action and is never inferred by the Skill.
+A visual `REVISE` continues:
 
-## Method selection
-Before an external agent begins a new initial candidate, BlendSmith requires a work-unit plan and a validated method selection. The default policy is **specialized first, scratch last**.
+```text
+VISUAL_REVIEW_VALIDATED
+-> AWAITING_CHANGE_IMPACT
+-> CHANGE_IMPACT_VALIDATED
+```
 
-For each work unit, the selection contract records discovery-source status, candidate method availability, requirement fit, probe evidence, the selected method, and bounded remaining manual work. `AVAILABLE` specialized methods with `FULL` or `PARTIAL_LOCAL_REFINEMENT` fit take precedence over `GENERAL_PURPOSE` or `SCRATCH` methods. A relevant specialized candidate left `UNKNOWN`, or a required discovery source left `BROKEN`/`UNKNOWN`, blocks selection until the uncertainty is resolved or explicitly unavailable.
+When GUI capability is available:
 
-The default discovery-source policy accounts for Blender native functionality, Geometry Node tools, asset libraries, extensions, project-local catalogs, and configured adapters. A source may be explicitly unavailable. For work-unit intents covered by BlendSmith's provider-neutral method catalog, every known dedicated-method hint must be explicitly accounted for as evaluated; omission is not a valid route to scratch modeling. The contract records execution evidence only and does not require private reasoning logs.
+```text
+RENDER_QA_ACCEPTED
+-> LIVE_GUI_DECISION
+-> AWAITING_LIVE_GUI_REVIEW
+-> LIVE_GUI_VALIDATED
+```
 
-When visual review returns `REVISE` with `revision_strategy=METHOD_RECONSIDERATION`, BlendSmith starts a new improvement iteration, clears the active candidate, and returns to method selection instead of entering the local fix-plan loop. `revision_strategy=LOCAL_REPAIR` keeps the existing bounded repair path.
+GUI `PASS` continues to final AI validation. GUI `REVISE` returns to `AWAITING_CHANGE_IMPACT` instead of directly entering `WORKING`.
 
-See `docs/METHOD_SELECTION.md` for the full gate contract.
+Final authority remains:
 
-## Visual review contract
-The core review schema is model-neutral. It requires run/candidate identity, reviewed SHA-256, verdict, opened evidence, issues, regressions, uncertainties, and next action. Reviewer perspectives may be selected by profile and are not hard-coded into the core schema.
+```text
+FINAL_AI_VALIDATION
+-> AI_ACCEPTED
+-> OWNER_REVIEW
+   -> ACCEPT(candidate_sha256)
+   -> REQUEST_REVISION
+   -> REJECT_RUN
+```
 
-Acceptance is blocked when required evidence was not opened, a critical/high issue remains, a major regression remains, or candidate SHA no longer matches the reviewed SHA.
+## Change Impact Gate
+
+A requested change from Visual Review, Live GUI Review, or Owner Revision is classified before further editing as one of:
+
+- `LOCAL`
+- `METHOD`
+- `STRUCTURAL`
+- `CONTRACT`
+
+### LOCAL
+
+The current plan and production method remain valid. The affected work units must preserve the exact validated selected methods through Method Continuity. A bounded Fix Plan then returns to `WORKING`.
+
+### METHOD
+
+The construction method itself is wrong. The current candidate is invalidated and the run returns through Method Selection before more production is authorized.
+
+### STRUCTURAL
+
+Production structure or dependencies must change. BlendSmith requires a new Method Plan revision, preserving the immutable predecessor SHA and invalidating affected downstream work before reselection and production.
+
+### CONTRACT
+
+The upstream requirement/plan itself must change. The old validated plan remains immutable and is superseded by a new revision before dependent work continues.
+
+No `METHOD`, `STRUCTURAL`, or `CONTRACT` change may silently fall through to direct local editing.
+
+## Global Reassessment
+
+Repeated local repair must not become an infinite patch stack.
+
+BlendSmith may enter `AWAITING_GLOBAL_REASSESSMENT` when local-repair streak policy or the Change Impact contract requires it. A valid reassessment must explicitly review:
+
+- Method Plan
+- Production Graph
+- Method Selection
+- current candidate
+- open issues
+- repair history
+
+It may then choose:
+
+- `CONTINUE_LOCAL`
+- `RESELECT_METHOD`
+- `REVISE_STRUCTURE`
+- `REVISE_CONTRACT`
+
+The selected path returns to the corresponding gate rather than editing immediately.
+
+## Visual review
+
+Visual review remains model-neutral and evidence-backed. It binds run/candidate identity and candidate SHA, records opened evidence, verdict, issues, regressions, uncertainties, and next action.
+
+Visual `ACCEPT` is blocked when required evidence was not opened, a critical/high issue remains, a major regression remains, or candidate identity no longer matches reviewed bytes.
+
+## Evidence Profiles
+
+Evidence requirements may be view-specific. A profile can define minimum width/height and orientation such as landscape, portrait, or square. Without a view-specific profile, the default minimum is applied as long-edge/short-edge requirements so valid portrait evidence is not rejected simply because width and height were swapped.
+
+## Exploratory Live GUI Review
+
+Policy is `required_if_capable`.
+
+- `AVAILABLE`: GUI review is required before AI acceptance.
+- `UNAVAILABLE`: render-only completion may proceed through the explicit unavailable path.
+- `BROKEN` / `UNKNOWN`: cannot justify a silent skip.
+
+A GUI `PASS` requires all of the following:
+
+- exact candidate identity and SHA
+- verified Blend path
+- dirty-state check
+- actual viewport interaction
+- orbit and zoom exploration
+- at least one viewpoint outside the fixed render set (for example unseen angle, backside, or underside)
+- at least three coverage categories
+- at least three observed GUI views
+- concrete observations
+- no blocking issue
+- no ignored medium/high quality-gain opportunity
+
+GUI review also has a bounded meaningful-quality-gain issue budget.
 
 ## Repair policy
-A repair iteration addresses at most two primary issues. `max_variants_per_iteration = 3`; this is a per-iteration cap, not a lifetime run-wide cap.
 
-## Live GUI review
-Policy is `required_if_capable`.
-- `AVAILABLE`: GUI review required before AI acceptance.
-- `UNAVAILABLE`: render-only completion allowed with explicit skip record and `render_verified` assurance.
-- `BROKEN`: bounded retry, then owner escalation if unresolved.
-- `UNKNOWN`: cannot justify a skip.
+A Fix Plan addresses at most two primary issues. Local repair must preserve methods authorized by the preceding `LOCAL` Change Impact decision.
 
-A GUI `PASS` requires correct Blend path verification, dirty-state check, actual viewport interaction, at least one observed view, matching candidate SHA-256, and no blocking GUI issue.
+`max_variants_per_iteration = 3`; this remains a per-iteration cap rather than a lifetime run-wide cap.
+
+## Owner Action Recovery
+
+`OWNER_ACTION_REQUIRED` is fail-closed. v0.0.2 supports same-run recovery for supported capability failures only when a newer explicit capability observation proves the recorded condition was repaired.
+
+An older/stale capability snapshot, a non-explicit probe, `BROKEN`, `UNKNOWN`, or a different unsupported failure category cannot authorize same-run recovery.
+
+Recovery returns to the recorded last healthy decision point; it does not jump to acceptance or publication.
+
+## Agent introspection
+
+`blendsmith next --project <project>` exposes the next valid action plus relevant authoritative identities such as current Method Plan/Selection SHA, candidate identity, candidate path, and candidate SHA. Agents should use this surface instead of guessing managed paths or IDs.
 
 ## Retry
-`max_retries = 3`: one initial attempt plus at most three retries, for at most four total attempts. Integrity, safety, authority, path-boundary, unknown-owner-state, destructive-overwrite, provenance/license uncertainty, and secret-exposure failures escalate without blind retry.
 
-After retry exhaustion, BlendSmith records an owner-action packet containing failure category, failed operation, attempts/retries, last healthy state, checkpoint reference, relevant evidence, requested owner action, resume instructions, and final/publication safety status.
+`max_retries = 3`: one initial attempt plus at most three retries, for at most four total attempts. Integrity, safety, authority, path-boundary, ambiguous owner state, destructive-overwrite, provenance/license uncertainty, and secret-exposure failures are not blindly retried.
 
-## Retention
-Classes:
+## Checkpoint and resume
+
+A checkpoint pins validated Method Plan and Method Selection snapshots, their SHA bindings and revision/round identity, candidate closure where present, iteration, and resume state.
+
+Resume revalidates the checkpoint, method identities, candidate manifest, closure digest, and canonical candidate before restoring authority. Conversational memory is not treated as lifecycle authority.
+
+## Retention and GC
+
+Retention classes remain:
+
 - `PINNED_INSTALLATION`
 - `PINNED_ENVIRONMENT`
 - `PINNED_ACTIVE_CHECKPOINT`
@@ -111,24 +288,37 @@ Classes:
 - `EPHEMERAL_SUPERSEDED_FINAL`
 - `LIGHTWEIGHT_HISTORY`
 
-There is no manual-pin feature in v0.0.1.
+There is no manual pin feature.
 
-Pinned checkpoints and finals protect a dependency closure, not only the root `.blend`. A pinned closure contains the root candidate, required dependency files, per-file SHA-256 values, a deterministic closure digest, and source identity metadata.
-
-A new checkpoint is materialized and verified before the previous active checkpoint is demoted. The same ordering applies to a replacement generation after revision.
-
-GC acts only on expired ephemeral records that are no longer referenced, are not current accepted results, still match their recorded digest, and are within BlendSmith-managed storage. Ambiguous paths are refused.
+GC acts only on eligible expired ephemeral records inside managed storage that still match recorded integrity data and are no longer authoritative.
 
 ## Publication
-`PUBLISHED` means the current local BlendSmith result was published from the exact human-accepted bytes and is the active publication managed by this project.
 
-Publication uses staging plus verification. Candidate and dependency hashes must match the accepted closure before the current-publication pointer changes. A revision retracts that pointer immediately.
+`PUBLISHED` means the current local BlendSmith publication was produced from the exact human-accepted candidate closure.
 
-## Provenance
-BlendSmith may record source, author, license, source reference, SHA-256, and notes for dependencies/external assets. When a project policy requires provenance, unknown required provenance blocks verified publication.
+Publication uses staging and exact-byte verification. Candidate/dependency hashes must still match the accepted closure before the current-publication pointer changes. A revision retracts the current pointer before the revision loop continues.
 
-## Interruption and resume
-An interruption is not a quality failure. BlendSmith creates a pinned checkpoint with run state, iteration, unresolved issues, review/fix-plan references, candidate closure, and next action. Resume revalidates checkpoint and candidate identity before returning to the saved active state.
+## Codex Skill boundary
+
+The bundled Codex Skill is a thin adapter. It must not emulate a successful transition the CLI/Core rejected. `blendsmith doctor` verifies the installed Skill bytes/version against the installed package, and a fresh Skill install/update requires a host restart because Core cannot prove the host reloaded new Skill bytes.
+
+Owner acceptance is never inferred by the Skill.
 
 ## Acceptance coverage
-Tests must cover method-gate ordering, specialized-first fallback enforcement, `UNKNOWN` handling, per-work-unit selection, method-mismatch re-entry, SHA-bound owner acceptance, post-review mutation blocking, revision retraction, replacement-generation ordering, capability downgrade prevention, strict GUI PASS rules, initial+3 retry behavior, review evidence gates, repair/variant budgets, checkpoint replacement, dependency-closure pinning, GC boundary/digest checks, and exact-byte verified publication.
+
+Tests cover, among other cases:
+
+- decomposition family accounting and graph-cycle rejection
+- per-operation Method Selection and specialized-first policy v2
+- evidence-backed waiver behavior
+- cache fingerprint validation and stale invalidation
+- Method Continuity during LOCAL repair
+- Change Impact routing for LOCAL/METHOD/STRUCTURAL/CONTRACT
+- immutable upstream plan revision and downstream invalidation
+- Global Reassessment context requirements
+- exploratory GUI PASS/REVISE rules and quality-gain bounds
+- same-run owner-action recovery requiring a newer explicit reprobe
+- portrait/landscape Evidence Profiles
+- SHA-bound owner acceptance and post-review mutation blocking
+- checkpoint/resume authority restoration
+- dependency-closure pinning, GC boundaries, and exact-byte verified publication

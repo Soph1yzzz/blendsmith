@@ -3,13 +3,23 @@
   "$id": "https://blendsmith.dev/schemas/fix_plan.schema.json",
   "$defs": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
   "type": "object",
-  "required": ["schema_version", "run_id", "candidate_id", "candidate_sha256", "primary_issue_ids", "steps", "expected_acceptance_tests"],
+  "required": [
+    "schema_version",
+    "run_id",
+    "candidate_id",
+    "candidate_sha256",
+    "primary_issue_ids",
+    "method_ids_to_preserve",
+    "steps",
+    "expected_acceptance_tests"
+  ],
   "properties": {
     "schema_version": {"const": 1},
     "run_id": {"type": "string", "minLength": 1},
     "candidate_id": {"type": "string", "minLength": 1},
     "candidate_sha256": {"$ref": "#/$defs/sha256"},
     "primary_issue_ids": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "maxItems": 2, "uniqueItems": true},
+    "method_ids_to_preserve": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "uniqueItems": true},
     "steps": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
     "expected_acceptance_tests": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1}
   },

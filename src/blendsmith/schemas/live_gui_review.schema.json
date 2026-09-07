@@ -1,9 +1,64 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://blendsmith.dev/schemas/live_gui_review.schema.json",
-  "$defs": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "issue": {
+      "type": "object",
+      "required": [
+        "issue_id",
+        "category",
+        "severity",
+        "region",
+        "observation",
+        "recommended_strategy",
+        "blocking",
+        "quality_gain"
+      ],
+      "properties": {
+        "issue_id": {"type": "string", "minLength": 1},
+        "category": {
+          "enum": [
+            "GEOMETRY",
+            "ATTACHMENT",
+            "THICKNESS",
+            "PROPORTION",
+            "MATERIAL",
+            "LIGHTING_RESPONSE",
+            "DETAIL_DEFICIT",
+            "STRUCTURAL",
+            "REFERENCE_FIDELITY",
+            "REGRESSION",
+            "OTHER"
+          ]
+        },
+        "severity": {"enum": ["low", "medium", "high", "critical"]},
+        "region": {"type": "string", "minLength": 1},
+        "observation": {"type": "string", "minLength": 1},
+        "recommended_strategy": {"type": "string", "minLength": 1},
+        "blocking": {"type": "boolean"},
+        "quality_gain": {"enum": ["NONE", "LOW", "MEDIUM", "HIGH"]}
+      },
+      "additionalProperties": false
+    }
+  },
   "type": "object",
-  "required": ["schema_version", "run_id", "candidate_id", "candidate_sha256", "status", "capability_status", "blend_path_verified", "dirty_state_checked", "viewport_interaction_performed", "views_observed", "issues"],
+  "required": [
+    "schema_version",
+    "run_id",
+    "candidate_id",
+    "candidate_sha256",
+    "status",
+    "capability_status",
+    "blend_path_verified",
+    "dirty_state_checked",
+    "viewport_interaction_performed",
+    "exploration_actions",
+    "coverage",
+    "views_observed",
+    "observations",
+    "issues"
+  ],
   "properties": {
     "schema_version": {"const": 1},
     "run_id": {"type": "string", "minLength": 1},
@@ -14,18 +69,54 @@
     "blend_path_verified": {"type": "boolean"},
     "dirty_state_checked": {"type": "boolean"},
     "viewport_interaction_performed": {"type": "boolean"},
-    "views_observed": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
-    "issues": {
+    "exploration_actions": {
       "type": "array",
       "items": {
-        "type": "object",
-        "required": ["description", "blocking"],
-        "properties": {
-          "description": {"type": "string", "minLength": 1},
-          "blocking": {"type": "boolean"}
-        },
-        "additionalProperties": false
-      }
+        "enum": [
+          "ORBIT",
+          "ZOOM",
+          "PAN",
+          "UNSEEN_ANGLE",
+          "BACKSIDE",
+          "UNDERSIDE",
+          "DETAIL_CLOSEUP",
+          "MATERIAL_PREVIEW",
+          "SOLID_VIEW",
+          "WIREFRAME",
+          "OBJECT_SELECT_FRAME",
+          "LIGHTING_VARIATION"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "coverage": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "OVERALL_FORM",
+          "THICKNESS_DEPTH",
+          "ATTACHMENTS",
+          "HIDDEN_SURFACES",
+          "DETAIL_DENSITY",
+          "MATERIAL_RESPONSE",
+          "STRUCTURAL_COHERENCE"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "views_observed": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    },
+    "observations": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    },
+    "issues": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/issue"}
     }
   },
   "allOf": [
@@ -37,7 +128,26 @@
           "blend_path_verified": {"const": true},
           "dirty_state_checked": {"const": true},
           "viewport_interaction_performed": {"const": true},
-          "views_observed": {"minItems": 1}
+          "exploration_actions": {"minItems": 3},
+          "coverage": {"minItems": 3},
+          "views_observed": {"minItems": 3},
+          "observations": {"minItems": 2}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"status": {"const": "REVISE"}}, "required": ["status"]},
+      "then": {
+        "properties": {
+          "capability_status": {"const": "AVAILABLE"},
+          "blend_path_verified": {"const": true},
+          "dirty_state_checked": {"const": true},
+          "viewport_interaction_performed": {"const": true},
+          "exploration_actions": {"minItems": 1},
+          "coverage": {"minItems": 1},
+          "views_observed": {"minItems": 1},
+          "observations": {"minItems": 1},
+          "issues": {"minItems": 1}
         }
       }
     },
