@@ -310,6 +310,7 @@ blendsmith schema visual_review
 blendsmith next --project <project>
 blendsmith domain-research --project <project> --input domain_research.json
 blendsmith knowledge-cache --project <project>
+blendsmith knowledge-cache-use --project <project>
 blendsmith domain-knowledge --project <project> --input domain_knowledge.json
 blendsmith domain-practice --project <project> --input domain_practice.json
 blendsmith method-hints --project <project> --intent symmetry
@@ -337,6 +338,9 @@ CLIが状態遷移を検証するので、エージェントがルールを覚�
 ## Core側で保証すること
 
 - **状態遷移の決定権はCoreに置く。** エージェントは操作を提案し、Coreが現在の状態から許可できるかを判定する。
+- **専門知識の要否を先に決める。** 機能、寸法、構造、工程、安全、規格、専門作法を制作前に一度は明示的に確認し、`NOT_REQUIRED`も根拠なしでは通さない。
+- **調査結果を文章のまま放置しない。** findingはSHA-boundなKnowledgeへ、actionableなfindingはPractice ruleへ、最終的にはwork unitの`domain_constraints`へ落とす。
+- **Knowledge Cacheは事実の再利用に限定する。** Practiceは各runで作り直し、前提知識そのものを疑って上流へ戻った場合はfresh knowledgeを要求する。
 - **作業分解を曖昧にしない。** 各work unitで既知のmethod familyを一度は明示的に確認する。
 - **Production Graphを状態として持つ。** work unitにはrationale、stage、依存関係を持たせ、上流変更時は影響する下流を古い状態として扱う。
 - **Specialized first, scratch last.** 要件を満たす専用手段を先に評価する。FULLの汎用methodがPARTIALの専用methodを上回るときだけ、根拠付きwaiverを許す。
@@ -351,7 +355,7 @@ CLIが状態遷移を検証するので、エージェントがルールを覚�
 - **Discovery Cacheは範囲を限定する。** 鮮度をCoreで証明できないsourceはcache authorityにしない。
 - **人間承認は明示的かつSHA-bound。** Ownerだけが、レビュー済みcandidateの正確なSHAを承認できる。
 - **retryは有限。** retry-safeな操作も初回＋最大3回まで。安全性や整合性に関わる曖昧さはOwnerへ返す。
-- **checkpointでも検証済みの状態を保つ。** Method receiptとcandidate closureを固定し、resume時に再検証する。
+- **checkpointでも検証済みの状態を保つ。** Domain Research / Knowledge / Practice、Method receipt、candidate closureを固定し、resume時に再検証する。
 - **GC対象を限定する。** 管理領域内で期限切れかつ検証済みの対象だけを整理する。
 - **契約はモデル非依存。** モデル固有の思考フォーマットではなく、状態と証拠を検証する。
 
@@ -395,9 +399,9 @@ CIはWindows / Ubuntu、Python 3.11 / 3.12で実行しています。
 
 現在の公開版は**v0.0.3 — Domain Knowledge**です。
 
-v0.0.2のProduction Structureに加え、v0.0.3ではDomain Research Gate、source-backed Domain Knowledge、Domain Practice、work unitのdomain_constraints、鮮度を制御したKnowledge Cache、前提知識まで戻るupstream re-entryを追加しています。
+v0.0.2のProduction Structureに加え、v0.0.3ではDomain Research Gate、source-backed Domain Knowledge、Domain Practice、work unitの`domain_constraints`、鮮度を制御したKnowledge Cache、前提知識まで戻るupstream re-entryを追加しています。
 
-**v0.0.1**は最初の公開版として残しています。
+**v0.0.2 — Production Structure**もそのまま残しています。**v0.0.1**は最初の公開版です。
 
 ## ライセンス
 
