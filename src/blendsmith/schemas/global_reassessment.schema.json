@@ -10,7 +10,8 @@
     "candidate_sha256",
     "decision",
     "reviewed_context",
-    "rationale"
+    "rationale",
+    "revisit_domain_knowledge"
   ],
   "properties": {
     "schema_version": {"const": 1},
@@ -23,6 +24,9 @@
       "minItems": 4,
       "items": {
         "enum": [
+          "DOMAIN_RESEARCH",
+          "DOMAIN_KNOWLEDGE",
+          "DOMAIN_PRACTICE",
           "METHOD_PLAN",
           "PRODUCTION_GRAPH",
           "METHOD_SELECTION",
@@ -36,11 +40,21 @@
       "uniqueItems": true
     },
     "rationale": {"type": "string", "minLength": 1},
+    "revisit_domain_knowledge": {"type": "boolean"},
     "affected_work_units": {
       "type": "array",
       "items": {"type": "string", "minLength": 1},
       "uniqueItems": true
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"decision": {"enum": ["CONTINUE_LOCAL", "RESELECT_METHOD"]}},
+        "required": ["decision"]
+      },
+      "then": {"properties": {"revisit_domain_knowledge": {"const": false}}}
+    }
+  ],
   "additionalProperties": false
 }

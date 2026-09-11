@@ -13,6 +13,9 @@ SCHEMA_FILES = {
     "run": "run.schema.json",
     "state_event": "state_event.schema.json",
     "capability_report": "capability_report.schema.json",
+    "domain_research": "domain_research.schema.json",
+    "domain_knowledge": "domain_knowledge.schema.json",
+    "domain_practice": "domain_practice.schema.json",
     "method_plan": "method_plan.schema.json",
     "method_selection": "method_selection.schema.json",
     "visual_review": "visual_review.schema.json",
@@ -125,6 +128,39 @@ def _runtime_invariants(name: str, payload: dict[str, Any]) -> None:
         raise ContractError("GUI skip is valid only when capability is UNAVAILABLE")
 
     if name == "checkpoint":
+        domain_research_fields = (
+            payload.get("domain_research_snapshot_path"),
+            payload.get("domain_research_sha256"),
+        )
+        if any(value is None for value in domain_research_fields) and any(
+            value is not None for value in domain_research_fields
+        ):
+            raise ContractError("Checkpoint domain-research identity must be fully present or fully absent")
+        domain_knowledge_fields = (
+            payload.get("domain_knowledge_snapshot_path"),
+            payload.get("domain_knowledge_sha256"),
+        )
+        if any(value is None for value in domain_knowledge_fields) and any(
+            value is not None for value in domain_knowledge_fields
+        ):
+            raise ContractError("Checkpoint domain-knowledge identity must be fully present or fully absent")
+        domain_practice_fields = (
+            payload.get("domain_practice_snapshot_path"),
+            payload.get("domain_practice_sha256"),
+        )
+        if any(value is None for value in domain_practice_fields) and any(
+            value is not None for value in domain_practice_fields
+        ):
+            raise ContractError("Checkpoint domain-practice identity must be fully present or fully absent")
+        if payload.get("domain_knowledge_snapshot_path") is not None and payload.get(
+            "domain_research_snapshot_path"
+        ) is None:
+            raise ContractError("Checkpoint domain knowledge requires a domain-research snapshot")
+        if payload.get("domain_practice_snapshot_path") is not None and payload.get(
+            "domain_knowledge_snapshot_path"
+        ) is None:
+            raise ContractError("Checkpoint domain practice requires a domain-knowledge snapshot")
+
         candidate_fields = (
             payload.get("candidate_id"),
             payload.get("candidate_sha256"),
@@ -179,6 +215,7 @@ def _validate_timestamps(name: str, payload: dict[str, Any]) -> None:
         "run": ("created_at", "updated_at"),
         "state_event": ("occurred_at",),
         "capability_report": ("captured_at",),
+        "domain_knowledge": ("collected_at",),
         "candidate_manifest": ("created_at",),
         "checkpoint": ("created_at",),
         "owner_decision": ("decided_at",),

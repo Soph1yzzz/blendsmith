@@ -1,48 +1,54 @@
 # BlendSmith Roadmap
 
-BlendSmith v0.0.1 established the model-neutral production loop: method selection, evidence-backed review, bounded repair or method reselection, checkpointing, live-GUI verification, exact human approval, retention, and verified publication.
+BlendSmith evolves by moving production decisions upstream without turning the Core into a domain-specific expert system.
 
-v0.0.2 moves the loop one level upstream. A visible defect is no longer assumed to be a local mesh problem: BlendSmith can return to the method, production structure, or upstream contract that actually introduced the bad decision.
+## v0.0.3 — Domain Knowledge
+
+v0.0.3 adds a knowledge layer before production structure. The loop can now ask whether real-world or specialist knowledge is needed, acquire or safely reuse that knowledge, convert it into actionable practice rules, and bind those rules into work-unit constraints before Method Selection begins.
+
+Shipped:
+
+- Domain Research Gate with seven explicitly accounted risk families
+- Domain Knowledge receipts with sources, findings, confidence, volatility, and limitations
+- Domain Practice Gate with actionable-rule / explicit-ignore accounting
+- `domain_constraints` bound from practice rules into Method Plan work units
+- confidence propagation that prevents downstream confidence laundering
+- scope- and freshness-bound Domain Knowledge Cache
+- cache reuse for facts without reusing practice authority
+- forced fresh research after an explicit upstream domain-knowledge reconsideration
+- Domain Research re-entry from STRUCTURAL / CONTRACT changes
+- domain authority in checkpoints, resume, `blendsmith next`, CLI schemas, and the bundled Skill
+- v0.0.2 run compatibility
+- multi-domain virtual dogfood and adversarial self-security coverage
+
+The key rule is: **research before a production decision when geometry depends on real-world knowledge; if that assumption later proves suspect, return to the knowledge layer instead of patching around it.**
 
 ## v0.0.2 — Production Structure
 
-### Shipped
+v0.0.2 moved review one level upstream from local repair:
 
-- **Work Unit Decomposition Gate** — every work unit must account for each known method family as `APPLICABLE` or `NOT_APPLICABLE`; applicable families require explicit method-selectable operations.
-- **Production Graph** — work units carry rationale, stage, and dependency edges; graph cycles and unknown dependencies are rejected.
-- **Method Selection Policy v2** — `SPECIALIZED + FULL` remains the default priority, while `GENERAL_PURPOSE + FULL` may displace `SPECIALIZED + PARTIAL_LOCAL_REFINEMENT` only with an evidence-backed waiver. Scratch remains the final fallback.
-- **Method Continuity Gate** — a `LOCAL` repair must preserve the validated methods for the affected work units.
-- **Change Impact Gate** — review findings are classified as `LOCAL`, `METHOD`, `STRUCTURAL`, or `CONTRACT` before editing continues.
-- **Upstream revision and graph invalidation** — structural/contract changes supersede the immutable previous Method Plan and invalidate affected downstream work before production resumes.
-- **Global Reassessment** — repeated local repair can force a whole-production-context review before another local patch is authorized.
-- **Exploratory Live GUI Review** — GUI review requires real exploratory coverage such as orbit, zoom, and an unseen viewpoint; meaningful quality-gain findings cannot be ignored in a `PASS`.
-- **Owner Action same-run recovery** — supported capability failures can re-enter the same run only after a newer explicit reprobe proves the condition was repaired.
-- **Evidence Profiles** — evidence can use orientation-aware per-view profiles instead of one global width/height rectangle.
-- **Agent introspection** — `blendsmith next` exposes the next valid action plus authoritative candidate/method identities instead of requiring the agent to guess internal paths.
-- **Bounded Method Discovery Cache** — reusable discovery facts are environment-bound and non-authoritative. Sources without a Core-owned freshness fingerprint must be checked again.
+- Work Unit Decomposition Gate
+- Production Graph
+- Method Selection Policy v2
+- bounded Method Discovery Cache
+- Change Impact: LOCAL / METHOD / STRUCTURAL / CONTRACT
+- Method Continuity
+- Global Reassessment
+- Exploratory Live GUI Review
+- same-run Owner Action recovery
+- Evidence Profiles and agent introspection
 
-### Deliberately not in v0.0.2
+## Later candidates
 
-The following ideas remain useful, but are not part of the v0.0.2 release contract:
+Useful directions that are intentionally not part of the v0.0.3 release contract:
 
-- domain-specific construction sequences
-- architecture-specific structural/coherence profiles
-- persistent first-class issue lineage (`OPEN`, `RESOLVED`, `DEFERRED`, `REGRESSION`, `SUPERSEDED`)
-- CAD recommendation or CAD intermediate workflows
-
-v0.0.2 keeps the production-structure layer model-neutral rather than claiming engineering or architecture-domain certification.
-
-## v0.0.3+
-
-Candidates for later releases:
-
-- construction-sequence / domain-profile support for architecture and other structure-heavy tasks
-- richer structural/coherence validation built on the Production Graph
-- persistent issue lineage across iterations
-- CAD recommendation and capability probing
-- CAD intermediate retention / GC using the existing checkpoint and TTL model
-- richer look-development provider support
-- additional Blender backends and adapters
-- source-specific freshness fingerprints that safely widen discovery-cache coverage
-- benchmark harnesses for measuring success rate, iteration count, and quality deltas
+- contract-template generation to reduce JSON ceremony without weakening gates
+- construction-sequence / richer domain profiles for architecture and other structure-heavy tasks
+- source-specific freshness proofs that safely widen cache coverage
+- persistent first-class issue lineage across iterations
+- CAD recommendation / capability probing and optional intermediate retention
+- richer look-development providers and Blender backends/adapters
+- benchmark harnesses for success rate, iteration count, and quality deltas
 - blind A/B evaluation of harnessed vs. non-harnessed workflows
+
+BlendSmith does not claim engineering, architectural, manufacturing, safety, or regulatory certification. Domain knowledge is evidence carried into a production contract, not a substitute for a qualified professional where one is required.

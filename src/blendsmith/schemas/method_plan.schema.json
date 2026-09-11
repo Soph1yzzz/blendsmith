@@ -18,6 +18,18 @@
       },
       "additionalProperties": false
     },
+    "domain_constraint": {
+      "type": "object",
+      "required": ["constraint_id", "practice_rule_id", "requirement", "confidence", "verification"],
+      "properties": {
+        "constraint_id": {"type": "string", "minLength": 1, "maxLength": 160},
+        "practice_rule_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "requirement": {"type": "string", "minLength": 1},
+        "confidence": {"enum": ["HIGH", "MEDIUM", "LOW"]},
+        "verification": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
     "family_check": {
       "type": "object",
       "required": ["intent", "status", "evidence"],
@@ -43,6 +55,9 @@
     "revision": {"type": "integer", "minimum": 0},
     "supersedes_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
     "revision_reason": {"type": ["string", "null"], "minLength": 1},
+    "domain_practice_sha256": {
+      "oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]
+    },
     "work_units": {
       "type": "array",
       "minItems": 1,
@@ -61,6 +76,7 @@
         "properties": {
           "work_unit_id": {"type": "string", "minLength": 1, "maxLength": 128},
           "intent": {"type": "string", "minLength": 1, "maxLength": 256},
+          "purpose": {"type": "string", "minLength": 1},
           "requirements": {
             "type": "array",
             "minItems": 1,
@@ -73,6 +89,10 @@
             "type": "array",
             "items": {"type": "string", "minLength": 1, "maxLength": 128},
             "uniqueItems": true
+          },
+          "domain_constraints": {
+            "type": "array",
+            "items": {"$ref": "#/$defs/domain_constraint"}
           },
           "method_family_checks": {
             "type": "array",

@@ -113,6 +113,7 @@ def test_global_reassessment_requires_whole_production_context() -> None:
         "candidate_id": "candidate-1",
         "candidate_sha256": SHA,
         "decision": "CONTINUE_LOCAL",
+        "revisit_domain_knowledge": False,
         "reviewed_context": ["METHOD_PLAN", "METHOD_SELECTION", "CANDIDATE", "OPEN_ISSUES"],
         "rationale": "Local repair still appears viable.",
         "affected_work_units": ["shape"],

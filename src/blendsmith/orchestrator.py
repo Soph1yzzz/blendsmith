@@ -9,6 +9,15 @@ from .capabilities import capture_capabilities, latest_snapshot
 from .checkpoint import materialize_checkpoint, restore_checkpoint_methods, verify_checkpoint
 from .closure import materialize_candidate_closure, verify_candidate_manifest
 from .contracts import validate_contract
+from .domain_knowledge import (
+    load_domain_knowledge_cache,
+    materialize_cached_domain_knowledge,
+    research_scope_fingerprint,
+    save_domain_knowledge_cache,
+    validate_domain_knowledge,
+    validate_domain_practice,
+    validate_domain_research,
+)
 from .errors import AuthorityError, CapabilityError, ContractError, IntegrityError
 from .evidence import materialize_evidence, verify_evidence_bundle
 from .gc import execute_gc, plan_gc
@@ -83,6 +92,8 @@ class BlendSmith:
             )
             return run
         transition(run_dir, run, RunState.BLENDER_PREFLIGHT, reason="Blender backend available")
+        run["metadata"]["domain_research_revision"] = 0
+        run["metadata"]["domain_research_history"] = []
         run["metadata"]["method_selection_round"] = 0
         run["metadata"]["method_plan_revision"] = 0
         run["metadata"]["local_repair_streak"] = 0
@@ -91,8 +102,151 @@ class BlendSmith:
         transition(
             run_dir,
             run,
+            RunState.AWAITING_DOMAIN_RESEARCH,
+            reason="decide whether domain knowledge is required before production planning",
+        )
+        return run
+
+    def submit_domain_research(self, payload: dict[str, Any]) -> dict[str, Any]:
+        run_dir, run = load_current_run(self.layout)
+        if RunState(run["state"]) != RunState.AWAITING_DOMAIN_RESEARCH:
+            raise ContractError("Domain research decision is not currently awaited")
+        validate_domain_research(payload, run=run)
+        revision = int(run["metadata"].get("domain_research_revision", 0))
+        path = run_dir / "domain" / f"research-r{revision}.json"
+        atomic_write_json(path, payload)
+        research_sha = sha256_file(path)
+        run["metadata"]["domain_research_path"] = path.relative_to(run_dir).as_posix()
+        run["metadata"]["domain_research_sha256"] = research_sha
+        run["metadata"].setdefault("domain_research_history", []).append(
+            {
+                "revision": revision,
+                "path": path.relative_to(run_dir).as_posix(),
+                "sha256": research_sha,
+                "supersedes_sha256": payload.get("supersedes_sha256"),
+            }
+        )
+        run["metadata"].pop("previous_domain_research_sha256", None)
+        run["metadata"].pop("pending_domain_research_revision_reason", None)
+        save_run(run_dir, run)
+        transition(run_dir, run, RunState.DOMAIN_RESEARCH_VALIDATED, reason="domain research gate validated")
+        if payload["decision"] == "RESEARCH_REQUIRED":
+            transition(
+                run_dir,
+                run,
+                RunState.AWAITING_DOMAIN_KNOWLEDGE,
+                reason="domain facts must be acquired or loaded from a valid knowledge cache",
+            )
+        else:
+            for key in (
+                "domain_knowledge_path",
+                "domain_knowledge_sha256",
+                "domain_practice_path",
+                "domain_practice_sha256",
+                "domain_knowledge_cache_status",
+                "domain_knowledge_fresh_required",
+            ):
+                run["metadata"].pop(key, None)
+            save_run(run_dir, run)
+            transition(
+                run_dir,
+                run,
+                RunState.AWAITING_METHOD_PLAN,
+                reason="domain research explicitly not required; production decomposition may proceed",
+            )
+        return run
+
+    def domain_knowledge_cache(self) -> dict[str, Any]:
+        run_dir, run = load_current_run(self.layout)
+        research_path = self._domain_research_file_path(run_dir, run)
+        research = json.loads(research_path.read_text(encoding="utf-8"))
+        if research["decision"] != "RESEARCH_REQUIRED":
+            return {"status": "NOT_APPLICABLE", "reason": "active domain research decision is NOT_REQUIRED"}
+        if run["metadata"].get("domain_knowledge_fresh_required"):
+            return {
+                "status": "BYPASS_REQUIRED",
+                "reason": "upstream domain assumptions were explicitly reopened; fresh knowledge is required",
+                "scope_fingerprint": research_scope_fingerprint(research),
+            }
+        return load_domain_knowledge_cache(self.layout, self.config, research=research)
+
+    def submit_domain_knowledge(self, payload: dict[str, Any]) -> dict[str, Any]:
+        run_dir, run = load_current_run(self.layout)
+        if RunState(run["state"]) != RunState.AWAITING_DOMAIN_KNOWLEDGE:
+            raise ContractError("Domain knowledge is not currently awaited")
+        research_path = self._domain_research_file_path(run_dir, run)
+        research_sha = sha256_file(research_path)
+        if research_sha != run["metadata"].get("domain_research_sha256"):
+            raise IntegrityError("Validated domain research bytes changed before knowledge submission")
+        research = json.loads(research_path.read_text(encoding="utf-8"))
+        if research["decision"] != "RESEARCH_REQUIRED":
+            raise ContractError("Domain knowledge cannot be submitted when research was NOT_REQUIRED")
+        validate_domain_knowledge(
+            payload,
+            run=run,
+            research=research,
+            expected_research_sha256=research_sha,
+        )
+        return self._store_domain_knowledge(run_dir, run, research, payload)
+
+    def use_domain_knowledge_cache(self) -> dict[str, Any]:
+        run_dir, run = load_current_run(self.layout)
+        if RunState(run["state"]) != RunState.AWAITING_DOMAIN_KNOWLEDGE:
+            raise ContractError("Domain knowledge cache can be used only while domain knowledge is awaited")
+        if run["metadata"].get("domain_knowledge_fresh_required"):
+            raise ContractError(
+                "Fresh domain knowledge is required because upstream domain assumptions were explicitly reopened"
+            )
+        research_path = self._domain_research_file_path(run_dir, run)
+        research_sha = sha256_file(research_path)
+        if research_sha != run["metadata"].get("domain_research_sha256"):
+            raise IntegrityError("Validated domain research bytes changed before cache reuse")
+        research = json.loads(research_path.read_text(encoding="utf-8"))
+        cache = load_domain_knowledge_cache(self.layout, self.config, research=research)
+        if cache.get("status") != "VALID":
+            raise ContractError(
+                f"No valid domain knowledge cache is available for the active research scope: {cache.get('status')}"
+            )
+        payload = materialize_cached_domain_knowledge(
+            cache,
+            run_id=run["run_id"],
+            research_sha256=research_sha,
+        )
+        validate_domain_knowledge(
+            payload,
+            run=run,
+            research=research,
+            expected_research_sha256=research_sha,
+        )
+        return self._store_domain_knowledge(run_dir, run, research, payload)
+
+    def submit_domain_practice(self, payload: dict[str, Any]) -> dict[str, Any]:
+        run_dir, run = load_current_run(self.layout)
+        if RunState(run["state"]) != RunState.AWAITING_DOMAIN_PRACTICE:
+            raise ContractError("Domain practice is not currently awaited")
+        knowledge_path = self._domain_knowledge_file_path(run_dir, run)
+        knowledge_sha = sha256_file(knowledge_path)
+        if knowledge_sha != run["metadata"].get("domain_knowledge_sha256"):
+            raise IntegrityError("Validated domain knowledge bytes changed before practice submission")
+        knowledge = json.loads(knowledge_path.read_text(encoding="utf-8"))
+        validate_domain_practice(
+            payload,
+            run=run,
+            knowledge=knowledge,
+            expected_knowledge_sha256=knowledge_sha,
+        )
+        revision = int(run["metadata"].get("domain_research_revision", 0))
+        path = run_dir / "domain" / f"practice-r{revision}.json"
+        atomic_write_json(path, payload)
+        run["metadata"]["domain_practice_path"] = path.relative_to(run_dir).as_posix()
+        run["metadata"]["domain_practice_sha256"] = sha256_file(path)
+        save_run(run_dir, run)
+        transition(run_dir, run, RunState.DOMAIN_PRACTICE_VALIDATED, reason="expert practice rules validated")
+        transition(
+            run_dir,
+            run,
             RunState.AWAITING_METHOD_PLAN,
-            reason="decompose production work before candidate generation",
+            reason="domain practice must now be mapped into work-unit constraints",
         )
         return run
 
@@ -106,7 +260,13 @@ class BlendSmith:
         run_dir, run = load_current_run(self.layout)
         if RunState(run["state"]) != RunState.AWAITING_METHOD_PLAN:
             raise ContractError("Method plan is not currently awaited")
-        validate_method_plan(payload, run=run)
+        practice, practice_sha = self._validate_current_domain_authority(run_dir, run)
+        validate_method_plan(
+            payload,
+            run=run,
+            domain_practice=practice,
+            expected_domain_practice_sha256=practice_sha,
+        )
         revision = int(run["metadata"].get("method_plan_revision", 0))
         path = run_dir / "methods" / f"method-plan-r{revision}.json"
         atomic_write_json(path, payload)
@@ -144,6 +304,13 @@ class BlendSmith:
         if plan_sha != run["metadata"].get("method_plan_sha256"):
             raise IntegrityError("Validated method plan bytes changed before method selection")
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
+        practice, practice_sha = self._validate_current_domain_authority(run_dir, run)
+        validate_method_plan(
+            plan,
+            run=run,
+            domain_practice=practice,
+            expected_domain_practice_sha256=practice_sha,
+        )
         cache_identity = method_cache_fingerprint(self.layout, self.config)
         expected_cache_fingerprint = (
             cache_identity.get("fingerprint")
@@ -368,7 +535,14 @@ class BlendSmith:
                 payload["affected_work_units"],
             )
             save_run(run_dir, run)
-            self._prepare_plan_revision(run_dir, run, reason=payload["upstream_change_summary"])
+            if payload["revisit_domain_knowledge"]:
+                self._prepare_domain_research_revision(
+                    run_dir,
+                    run,
+                    reason=payload["upstream_change_summary"],
+                )
+            else:
+                self._prepare_plan_revision(run_dir, run, reason=payload["upstream_change_summary"])
         return run
 
     def submit_global_reassessment(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -411,7 +585,10 @@ class BlendSmith:
             )["affected_work_units"]
             run["metadata"]["stale_work_units"] = self._downstream_work_units(plan, affected)
             save_run(run_dir, run)
-            self._prepare_plan_revision(run_dir, run, reason=payload["rationale"])
+            if payload["revisit_domain_knowledge"]:
+                self._prepare_domain_research_revision(run_dir, run, reason=payload["rationale"])
+            else:
+                self._prepare_plan_revision(run_dir, run, reason=payload["rationale"])
         return run
 
     def submit_fix_plan(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -641,6 +818,10 @@ class BlendSmith:
         run["resume_state"] = resume_state.value
         save_run(run_dir, run)
         transition(run_dir, run, RunState.CHECKPOINTING, reason="checkpoint requested")
+        domain_research_path, domain_knowledge_path, domain_practice_path = self._checkpoint_domain_paths(
+            run_dir,
+            run,
+        )
         method_plan_path, method_selection_path = self._checkpoint_method_paths(run_dir, run)
         checkpoint_path, checkpoint = materialize_checkpoint(
             run_dir,
@@ -648,6 +829,9 @@ class BlendSmith:
             candidate_manifest_path=(
                 self._manifest_path(run_dir, run) if run.get("active_candidate_id") else None
             ),
+            domain_research_path=domain_research_path,
+            domain_knowledge_path=domain_knowledge_path,
+            domain_practice_path=domain_practice_path,
             method_plan_path=method_plan_path,
             method_selection_path=method_selection_path,
             resume_state=resume_state.value,
@@ -669,6 +853,10 @@ class BlendSmith:
             saved_state = run.get("resume_state")
             if not saved_state:
                 raise IntegrityError("Interrupted checkpoint has no recorded resume state")
+            domain_research_path, domain_knowledge_path, domain_practice_path = self._checkpoint_domain_paths(
+                run_dir,
+                run,
+            )
             method_plan_path, method_selection_path = self._checkpoint_method_paths(run_dir, run)
             checkpoint_path, checkpoint = materialize_checkpoint(
                 run_dir,
@@ -676,6 +864,9 @@ class BlendSmith:
                 candidate_manifest_path=(
                     self._manifest_path(run_dir, run) if run.get("active_candidate_id") else None
                 ),
+                domain_research_path=domain_research_path,
+                domain_knowledge_path=domain_knowledge_path,
+                domain_practice_path=domain_practice_path,
                 method_plan_path=method_plan_path,
                 method_selection_path=method_selection_path,
                 resume_state=saved_state,
@@ -701,6 +892,28 @@ class BlendSmith:
         resume_state = RunState(checkpoint["resume_state"])
 
         restored_methods = restore_checkpoint_methods(checkpoint_path, run_dir)
+        restored_domain_revision = restored_methods.get("domain_research_revision")
+        if restored_domain_revision is not None:
+            run["metadata"]["domain_research_revision"] = restored_domain_revision
+            if restored_methods.get("domain_research_path") is not None:
+                run["metadata"]["domain_research_path"] = restored_methods["domain_research_path"]
+                run["metadata"]["domain_research_sha256"] = restored_methods["domain_research_sha256"]
+            else:
+                run["metadata"].pop("domain_research_path", None)
+                run["metadata"].pop("domain_research_sha256", None)
+            if restored_methods.get("domain_knowledge_path") is not None:
+                run["metadata"]["domain_knowledge_path"] = restored_methods["domain_knowledge_path"]
+                run["metadata"]["domain_knowledge_sha256"] = restored_methods["domain_knowledge_sha256"]
+            else:
+                run["metadata"].pop("domain_knowledge_path", None)
+                run["metadata"].pop("domain_knowledge_sha256", None)
+            if restored_methods.get("domain_practice_path") is not None:
+                run["metadata"]["domain_practice_path"] = restored_methods["domain_practice_path"]
+                run["metadata"]["domain_practice_sha256"] = restored_methods["domain_practice_sha256"]
+            else:
+                run["metadata"].pop("domain_practice_path", None)
+                run["metadata"].pop("domain_practice_sha256", None)
+
         if restored_methods["method_plan_path"] is not None:
             run["metadata"]["method_plan_path"] = restored_methods["method_plan_path"]
             run["metadata"]["method_plan_id"] = restored_methods["method_plan_id"]
@@ -810,6 +1023,16 @@ class BlendSmith:
         run_dir, run = load_current_run(self.layout)
         state = RunState(run["state"])
         commands = {
+            RunState.AWAITING_DOMAIN_RESEARCH: (
+                "blendsmith domain-research --project <project> --input <domain_research.json>"
+            ),
+            RunState.AWAITING_DOMAIN_KNOWLEDGE: (
+                "blendsmith knowledge-cache --project <project>; then use knowledge-cache-use "
+                "or submit domain-knowledge"
+            ),
+            RunState.AWAITING_DOMAIN_PRACTICE: (
+                "blendsmith domain-practice --project <project> --input <domain_practice.json>"
+            ),
             RunState.AWAITING_METHOD_PLAN: (
                 "blendsmith method-plan --project <project> --input <method_plan.json>"
             ),
@@ -848,6 +1071,10 @@ class BlendSmith:
                 if run.get("active_candidate_id")
                 else "blendsmith candidate-add --project <project> --candidate <scene.blend>"
             )
+        elif state == RunState.AWAITING_DOMAIN_KNOWLEDGE and run["metadata"].get(
+            "domain_knowledge_fresh_required"
+        ):
+            command = "blendsmith domain-knowledge --project <project> --input <domain_knowledge.json>"
         else:
             command = commands.get(state)
 
@@ -856,6 +1083,10 @@ class BlendSmith:
             "state": state.value,
             "iteration": run["iteration"],
             "next_command": command,
+            "domain_research_revision": run["metadata"].get("domain_research_revision"),
+            "domain_research_sha256": run["metadata"].get("domain_research_sha256"),
+            "domain_knowledge_sha256": run["metadata"].get("domain_knowledge_sha256"),
+            "domain_practice_sha256": run["metadata"].get("domain_practice_sha256"),
             "method_plan_revision": run["metadata"].get("method_plan_revision"),
             "method_plan_sha256": run["metadata"].get("method_plan_sha256"),
             "method_selection_round": run["metadata"].get("method_selection_round"),
@@ -1046,6 +1277,136 @@ class BlendSmith:
         path = self._metadata_path(run_dir, run, key)
         return json.loads(path.read_text(encoding="utf-8"))
 
+    def _validate_current_domain_authority(
+        self,
+        run_dir: Path,
+        run: dict[str, Any],
+    ) -> tuple[dict[str, Any] | None, str | None]:
+        if "domain_research_revision" not in run["metadata"]:
+            if run["metadata"].get("domain_research_path"):
+                raise IntegrityError("Legacy run has unexpected domain-research authority")
+            return None, None
+        research_path = self._domain_research_file_path(run_dir, run)
+        research_sha = sha256_file(research_path)
+        if research_sha != run["metadata"].get("domain_research_sha256"):
+            raise IntegrityError("Validated domain research bytes changed outside the authorized lifecycle")
+        research = json.loads(research_path.read_text(encoding="utf-8"))
+        validate_domain_research(research, run=run)
+        if research["decision"] == "NOT_REQUIRED":
+            if run["metadata"].get("domain_knowledge_path") or run["metadata"].get("domain_practice_path"):
+                raise IntegrityError("NOT_REQUIRED domain research cannot retain downstream knowledge authority")
+            return None, None
+
+        knowledge_path = self._domain_knowledge_file_path(run_dir, run)
+        knowledge_sha = sha256_file(knowledge_path)
+        if knowledge_sha != run["metadata"].get("domain_knowledge_sha256"):
+            raise IntegrityError("Validated domain knowledge bytes changed outside the authorized lifecycle")
+        knowledge = json.loads(knowledge_path.read_text(encoding="utf-8"))
+        validate_domain_knowledge(
+            knowledge,
+            run=run,
+            research=research,
+            expected_research_sha256=research_sha,
+        )
+
+        practice_path = self._domain_practice_file_path(run_dir, run)
+        practice_sha = sha256_file(practice_path)
+        if practice_sha != run["metadata"].get("domain_practice_sha256"):
+            raise IntegrityError("Validated domain practice bytes changed outside the authorized lifecycle")
+        practice = json.loads(practice_path.read_text(encoding="utf-8"))
+        validate_domain_practice(
+            practice,
+            run=run,
+            knowledge=knowledge,
+            expected_knowledge_sha256=knowledge_sha,
+        )
+        return practice, practice_sha
+
+    def _store_domain_knowledge(
+        self,
+        run_dir: Path,
+        run: dict[str, Any],
+        research: dict[str, Any],
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        revision = int(run["metadata"].get("domain_research_revision", 0))
+        path = run_dir / "domain" / f"knowledge-r{revision}.json"
+        atomic_write_json(path, payload)
+        knowledge_sha = sha256_file(path)
+        run["metadata"]["domain_knowledge_path"] = path.relative_to(run_dir).as_posix()
+        run["metadata"]["domain_knowledge_sha256"] = knowledge_sha
+        cached = save_domain_knowledge_cache(
+            self.layout,
+            self.config,
+            research=research,
+            knowledge=payload,
+            knowledge_sha256=knowledge_sha,
+        )
+        run["metadata"]["domain_knowledge_cache_status"] = (
+            "SAVED" if cached is not None else payload["acquisition"]
+        )
+        if payload["acquisition"] == "FRESH":
+            run["metadata"].pop("domain_knowledge_fresh_required", None)
+        save_run(run_dir, run)
+        transition(run_dir, run, RunState.DOMAIN_KNOWLEDGE_VALIDATED, reason="domain knowledge receipt validated")
+        transition(
+            run_dir,
+            run,
+            RunState.AWAITING_DOMAIN_PRACTICE,
+            reason="domain findings must be converted into actionable expert-practice rules",
+        )
+        return run
+
+    def _domain_research_file_path(self, run_dir: Path, run: dict[str, Any]) -> Path:
+        actual = self._metadata_path(run_dir, run, "domain_research_path")
+        revision = int(run["metadata"].get("domain_research_revision", 0))
+        expected = ensure_within(run_dir, run_dir / "domain" / f"research-r{revision}.json")
+        if actual != expected:
+            raise IntegrityError("Run domain-research path does not match the active research revision")
+        return actual
+
+    def _domain_knowledge_file_path(self, run_dir: Path, run: dict[str, Any]) -> Path:
+        actual = self._metadata_path(run_dir, run, "domain_knowledge_path")
+        revision = int(run["metadata"].get("domain_research_revision", 0))
+        expected = ensure_within(run_dir, run_dir / "domain" / f"knowledge-r{revision}.json")
+        if actual != expected:
+            raise IntegrityError("Run domain-knowledge path does not match the active research revision")
+        return actual
+
+    def _domain_practice_file_path(self, run_dir: Path, run: dict[str, Any]) -> Path:
+        actual = self._metadata_path(run_dir, run, "domain_practice_path")
+        revision = int(run["metadata"].get("domain_research_revision", 0))
+        expected = ensure_within(run_dir, run_dir / "domain" / f"practice-r{revision}.json")
+        if actual != expected:
+            raise IntegrityError("Run domain-practice path does not match the active research revision")
+        return actual
+
+    def _checkpoint_domain_paths(
+        self,
+        run_dir: Path,
+        run: dict[str, Any],
+    ) -> tuple[Path | None, Path | None, Path | None]:
+        research_path = (
+            self._domain_research_file_path(run_dir, run)
+            if run["metadata"].get("domain_research_path")
+            else None
+        )
+        knowledge_path = (
+            self._domain_knowledge_file_path(run_dir, run)
+            if run["metadata"].get("domain_knowledge_path")
+            else None
+        )
+        practice_path = (
+            self._domain_practice_file_path(run_dir, run)
+            if run["metadata"].get("domain_practice_path")
+            else None
+        )
+        if knowledge_path is not None and research_path is None:
+            raise IntegrityError("Active domain knowledge has no authoritative research receipt")
+        if practice_path is not None and knowledge_path is None:
+            raise IntegrityError("Active domain practice has no authoritative knowledge receipt")
+        return research_path, knowledge_path, practice_path
+
     def _checkpoint_method_paths(
         self,
         run_dir: Path,
@@ -1098,6 +1459,13 @@ class BlendSmith:
         if not recorded_plan_sha or plan_sha != recorded_plan_sha:
             raise IntegrityError("Validated method plan bytes changed outside the authorized lifecycle")
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
+        practice, practice_sha = self._validate_current_domain_authority(run_dir, run)
+        validate_method_plan(
+            plan,
+            run=run,
+            domain_practice=practice,
+            expected_domain_practice_sha256=practice_sha,
+        )
 
         selection_path = self._method_selection_file_path(run_dir, run)
         selection_sha = sha256_file(selection_path)
@@ -1214,6 +1582,63 @@ class BlendSmith:
             run,
             RunState.AWAITING_METHOD_SELECTION,
             reason="new specialized-method selection required before another candidate",
+        )
+
+    def _prepare_domain_research_revision(self, run_dir: Path, run: dict[str, Any], *, reason: str) -> None:
+        current_research_path = self._domain_research_file_path(run_dir, run)
+        current_research_sha = sha256_file(current_research_path)
+        if current_research_sha != run["metadata"].get("domain_research_sha256"):
+            raise IntegrityError("Cannot revise domain research whose authoritative bytes changed")
+
+        current_plan_path = self._method_plan_file_path(run_dir, run)
+        current_plan_sha = sha256_file(current_plan_path)
+        if current_plan_sha != run["metadata"].get("method_plan_sha256"):
+            raise IntegrityError("Cannot revise a method plan whose authoritative bytes changed")
+
+        run["iteration"] += 1
+        run["metadata"]["previous_domain_research_sha256"] = current_research_sha
+        run["metadata"]["domain_research_revision"] = int(
+            run["metadata"].get("domain_research_revision", 0)
+        ) + 1
+        run["metadata"]["pending_domain_research_revision_reason"] = reason
+        run["metadata"]["domain_knowledge_fresh_required"] = True
+        run["metadata"]["previous_method_plan_sha256"] = current_plan_sha
+        run["metadata"]["method_plan_revision"] = int(run["metadata"].get("method_plan_revision", 0)) + 1
+        run["metadata"]["method_selection_round"] = int(
+            run["metadata"].get("method_selection_round", 0)
+        ) + 1
+        run["metadata"]["pending_plan_revision_reason"] = reason
+        run["metadata"]["local_repair_streak"] = 0
+        run["active_candidate_id"] = None
+        run["assurance_level"] = None
+        for key in (
+            "domain_research_path",
+            "domain_research_sha256",
+            "domain_knowledge_path",
+            "domain_knowledge_sha256",
+            "domain_practice_path",
+            "domain_practice_sha256",
+            "domain_knowledge_cache_status",
+            "method_plan_path",
+            "method_plan_id",
+            "method_plan_sha256",
+            "method_selection_path",
+            "method_selection_sha256",
+            "candidate_manifest_path",
+            "evidence_bundle_path",
+            "visual_review_path",
+            "fix_plan_path",
+            "live_gui_review_path",
+            "change_impact_path",
+            "global_reassessment_path",
+        ):
+            run["metadata"].pop(key, None)
+        save_run(run_dir, run)
+        transition(
+            run_dir,
+            run,
+            RunState.AWAITING_DOMAIN_RESEARCH,
+            reason="upstream domain assumptions must be reconsidered before production planning",
         )
 
     def _prepare_plan_revision(self, run_dir: Path, run: dict[str, Any], *, reason: str) -> None:

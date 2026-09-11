@@ -27,7 +27,12 @@ Candidate metadata, method contracts, checkpoint metadata, retention records, an
 
 Configured discovery sources must be accounted for before production begins. A required discovery source left `BROKEN`/`UNKNOWN`, or a relevant specialized method left `UNKNOWN`, blocks method selection rather than silently authorizing a general-purpose/scratch fallback.
 
-v0.0.2 also separates cached discovery evidence from selection authority. Cache identity is environment-bound, only sources with a Core-owned freshness boundary may be reused, and later candidate operations revalidate the same current cache fingerprint semantics. Project catalogs, adapters, external Node Tools, or other sources without a safe freshness proof must be checked again rather than treated as authoritative cached facts.
+BlendSmith separates cached method-discovery evidence from selection authority. Cache identity is environment-bound, only sources with a Core-owned freshness boundary may be reused, and later candidate operations revalidate the same current cache fingerprint semantics. Project catalogs, adapters, external Node Tools, or other sources without a safe freshness proof must be checked again rather than treated as authoritative cached facts.
+
+v0.0.3 applies the same authority separation to domain knowledge. A cached knowledge receipt is scope-, digest-, epoch-, and volatility/TTL-bound. Core recomputes the validity window instead of trusting mutable cache metadata. Cache reuse restores facts only; a new run still requires a new Domain Practice receipt before Method Plan authority exists. If Change Impact or Global Reassessment explicitly returns to Domain Research because the underlying assumption is suspect, that revision requires fresh knowledge and cannot immediately reuse the questioned cache.
+
+The Domain Research → Knowledge → Practice → Method Plan chain is SHA-bound. Validated receipts are rehashed before downstream use, checkpoint snapshots preserve the chain, and confidence may only stay the same or weaken downstream; a low-confidence finding cannot silently become a high-confidence production constraint.
+
 
 External agents provide probe evidence through structured contracts; BlendSmith validates the policy and identity bindings but cannot cryptographically prove that a remote/model-produced observation was truthful. Hosts should use real Blender/tool inspection for discovery evidence rather than model memory alone.
 

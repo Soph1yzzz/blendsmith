@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blendsmith.dev/schemas/domain_knowledge.schema.json",
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "source": {
+      "type": "object",
+      "required": ["source_id", "kind", "title", "locator", "accessed_at"],
+      "properties": {
+        "source_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "kind": {"enum": ["WEB", "DOCUMENT", "STANDARD", "MANUAL", "EXPERT", "PROJECT_REFERENCE", "OTHER"]},
+        "title": {"type": "string", "minLength": 1},
+        "locator": {"type": "string", "minLength": 1},
+        "accessed_at": {"type": "string", "format": "date-time"}
+      },
+      "additionalProperties": false
+    },
+    "finding": {
+      "type": "object",
+      "required": ["finding_id", "category", "statement", "source_ids", "confidence", "actionable"],
+      "properties": {
+        "finding_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "category": {"enum": ["FUNCTION", "DIMENSION", "STRUCTURE", "PROCESS", "PLACEMENT", "MATERIAL", "SAFETY", "REGULATION", "OTHER"]},
+        "statement": {"type": "string", "minLength": 1},
+        "source_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 128}
+        },
+        "confidence": {"enum": ["HIGH", "MEDIUM", "LOW"]},
+        "actionable": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "topic": {
+      "type": "object",
+      "required": ["topic_key", "volatility", "sources", "findings"],
+      "properties": {
+        "topic_key": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+        "volatility": {"enum": ["STABLE", "SLOW_CHANGING", "CURRENT"]},
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/source"}
+        },
+        "findings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/finding"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "cache_origin": {
+      "type": "object",
+      "required": ["scope_fingerprint", "original_knowledge_sha256", "cached_at", "valid_until"],
+      "properties": {
+        "scope_fingerprint": {"$ref": "#/$defs/sha256"},
+        "original_knowledge_sha256": {"$ref": "#/$defs/sha256"},
+        "cached_at": {"type": "string", "format": "date-time"},
+        "valid_until": {"type": ["string", "null"], "format": "date-time"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "research_sha256",
+    "knowledge_id",
+    "domain",
+    "collected_at",
+    "acquisition",
+    "scope_fingerprint",
+    "topics",
+    "limitations",
+    "cache_origin"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "research_sha256": {"$ref": "#/$defs/sha256"},
+    "knowledge_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "domain": {"type": "string", "minLength": 1, "maxLength": 256},
+    "collected_at": {"type": "string", "format": "date-time"},
+    "acquisition": {"enum": ["FRESH", "CACHE"]},
+    "scope_fingerprint": {"$ref": "#/$defs/sha256"},
+    "topics": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/topic"}
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    },
+    "cache_origin": {
+      "oneOf": [
+        {"$ref": "#/$defs/cache_origin"},
+        {"type": "null"}
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"acquisition": {"const": "FRESH"}}, "required": ["acquisition"]},
+      "then": {"properties": {"cache_origin": {"type": "null"}}}
+    },
+    {
+      "if": {"properties": {"acquisition": {"const": "CACHE"}}, "required": ["acquisition"]},
+      "then": {"properties": {"cache_origin": {"$ref": "#/$defs/cache_origin"}}}
+    }
+  ],
+  "additionalProperties": false
+}

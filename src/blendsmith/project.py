@@ -50,6 +50,14 @@ class ProjectLayout:
         return self.control / "history"
 
     @property
+    def knowledge(self) -> Path:
+        return self.control / "knowledge"
+
+    @property
+    def knowledge_cache(self) -> Path:
+        return self.knowledge / "cache"
+
+    @property
     def current_run_pointer(self) -> Path:
         return self.control / "current_run.json"
 
@@ -98,6 +106,14 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "global_reassessment_after_local_repairs": 2,
         "max_gui_quality_gain_issues": 2,
     },
+    "domain_knowledge": {
+        "enabled": True,
+        "cache_enabled": True,
+        "stable_cache_allowed": True,
+        "slow_changing_ttl_days": 180,
+        "current_ttl_days": 7,
+        "cache_epoch": 0,
+    },
     "recovery": {"max_retries": 3, "escalate_non_retryable_immediately": True},
     "provenance": {"required_for_publication": False},
 }
@@ -129,7 +145,13 @@ def initialize_project(root: Path, *, project_id: str | None = None) -> ProjectL
     validate_contract("project", config)
     atomic_write_json(layout.config, config)
 
-    for path in (layout.install, layout.capabilities, layout.runs, layout.history):
+    for path in (
+        layout.install,
+        layout.capabilities,
+        layout.runs,
+        layout.history,
+        layout.knowledge_cache,
+    ):
         path.mkdir(parents=True, exist_ok=True)
     create_identity_locks(layout)
     return layout
@@ -155,7 +177,15 @@ def load_project(root: Path) -> tuple[ProjectLayout, dict[str, Any]]:
         raise SafetyError(f"Project config cannot be a symlink/junction/reparse point: {layout.config}")
     if not layout.config.is_file():
         raise FileNotFoundError(f"Not a BlendSmith project: {root}")
-    for managed in (layout.control, layout.install, layout.capabilities, layout.runs, layout.history):
+    for managed in (
+        layout.control,
+        layout.install,
+        layout.capabilities,
+        layout.runs,
+        layout.history,
+        layout.knowledge,
+        layout.knowledge_cache,
+    ):
         if managed.exists() and _is_reparse_point(managed):
             raise SafetyError(f"Managed BlendSmith path cannot be a reparse point: {managed}")
     raw_config = json.loads(layout.config.read_text(encoding="utf-8"))

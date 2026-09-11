@@ -58,9 +58,39 @@ def build_parser() -> argparse.ArgumentParser:
     preflight.add_argument("--live-gui", choices=CAP_STATES)
     preflight.add_argument("--render-review", choices=CAP_STATES)
 
-    start = sub.add_parser("start", help="Start a run and enter the method-selection gate")
+    start = sub.add_parser("start", help="Start a run and enter the domain-research gate")
     start.add_argument("--project", required=True)
     start.add_argument("--blender")
+
+    domain_research = sub.add_parser(
+        "domain-research",
+        help="Decide whether domain research is required before planning",
+    )
+    domain_research.add_argument("--project", required=True)
+    domain_research.add_argument("--input", required=True)
+
+    knowledge_cache = sub.add_parser(
+        "knowledge-cache",
+        help="Inspect reusable domain knowledge for the active research scope",
+    )
+    knowledge_cache.add_argument("--project", required=True)
+
+    knowledge_cache_use = sub.add_parser(
+        "knowledge-cache-use",
+        help="Use a valid cached domain-knowledge receipt for this run",
+    )
+    knowledge_cache_use.add_argument("--project", required=True)
+
+    domain_knowledge = sub.add_parser("domain-knowledge", help="Submit fresh researched domain knowledge")
+    domain_knowledge.add_argument("--project", required=True)
+    domain_knowledge.add_argument("--input", required=True)
+
+    domain_practice = sub.add_parser(
+        "domain-practice",
+        help="Turn domain findings into actionable production practice rules",
+    )
+    domain_practice.add_argument("--project", required=True)
+    domain_practice.add_argument("--input", required=True)
 
     hints = sub.add_parser("method-hints", help="Show provider-neutral method discovery hints")
     hints.add_argument("--project", required=True)
@@ -220,6 +250,16 @@ def main(argv: list[str] | None = None) -> int:
             )
         elif args.command == "start":
             result = app.start(blender_path=args.blender)
+        elif args.command == "domain-research":
+            result = app.submit_domain_research(_json_file(args.input))
+        elif args.command == "knowledge-cache":
+            result = app.domain_knowledge_cache()
+        elif args.command == "knowledge-cache-use":
+            result = app.use_domain_knowledge_cache()
+        elif args.command == "domain-knowledge":
+            result = app.submit_domain_knowledge(_json_file(args.input))
+        elif args.command == "domain-practice":
+            result = app.submit_domain_practice(_json_file(args.input))
         elif args.command == "method-hints":
             result = app.method_hints(args.intent)
         elif args.command == "method-cache":

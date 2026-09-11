@@ -103,6 +103,18 @@ def validate_global_reassessment(
     validate_contract("global_reassessment", payload)
     manifest = verify_candidate_manifest(manifest_path)
     _assert_identity(payload, run, manifest)
+    if "domain_research_revision" in run["metadata"]:
+        required_domain_context = {"DOMAIN_RESEARCH"}
+        if run["metadata"].get("domain_knowledge_path"):
+            required_domain_context.add("DOMAIN_KNOWLEDGE")
+        if run["metadata"].get("domain_practice_path"):
+            required_domain_context.add("DOMAIN_PRACTICE")
+        missing_domain_context = sorted(required_domain_context - set(payload["reviewed_context"]))
+        if missing_domain_context:
+            raise ContractError(
+                "Global reassessment must include active domain authority; missing: "
+                + ", ".join(missing_domain_context)
+            )
     unit_ids = {item["work_unit_id"] for item in method_plan["work_units"]}
     unknown = sorted(set(payload.get("affected_work_units", [])) - unit_ids)
     if unknown:

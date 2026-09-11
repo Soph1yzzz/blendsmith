@@ -2,13 +2,13 @@
 
 BlendSmith treats **knowing that a Blender feature exists**, **decomposing work so the feature is visible to the planner**, and **choosing the best available production method** as separate problems.
 
-v0.0.2 therefore puts Method Selection behind a Work Unit Decomposition Gate.
+BlendSmith puts Method Selection behind a Work Unit Decomposition Gate.
 
 ## Core rule
 
 **Specialized first, scratch last.**
 
-But v0.0.2 applies that rule per method-selectable operation, not merely per broad work unit.
+The current policy applies that rule per method-selectable operation, not merely per broad work unit.
 
 ## 1. Decompose before selecting
 

@@ -10,6 +10,9 @@ Runtime schemas live in `src/blendsmith/schemas/` and use JSON Schema Draft 2020
 - `run.schema.json` — authoritative run state.
 - `state_event.schema.json` — append-only state-transition event.
 - `capability_report.schema.json` — timestamped runtime capability snapshot.
+- `domain_research.schema.json` — decides whether domain research is required and accounts for every domain-risk family.
+- `domain_knowledge.schema.json` — source-backed findings, confidence, volatility, limitations, cache origin, and research binding.
+- `domain_practice.schema.json` — actionable production rules derived from knowledge findings, plus explicit ignored findings.
 - `method_plan.schema.json` — Work Unit Decomposition Gate + dependency-aware Production Graph.
 - `method_selection.schema.json` — probed method choice for every method operation, with policy-v2 waiver support.
 - `candidate_manifest.schema.json` — pinned `.blend` plus dependency closure, Method Plan/Selection bindings, and digests.
@@ -20,7 +23,7 @@ Runtime schemas live in `src/blendsmith/schemas/` and use JSON Schema Draft 2020
 - `live_gui_review.schema.json` — exploratory live Blender GUI observation result.
 - `owner_decision.schema.json` — `ACCEPT`, `REQUEST_REVISION`, or `REJECT_RUN`.
 - `owner_action_required.schema.json` — bounded-failure escalation packet with failure timestamp.
-- `checkpoint.schema.json` — resumable verified snapshot including method-plan revision and selection round.
+- `checkpoint.schema.json` — resumable verified snapshot including domain-research/knowledge/practice authority, method-plan revision, and selection round.
 - `retention_record.schema.json` — PIN/TTL lifecycle record.
 - `provenance.schema.json` — optional dependency/source provenance.
 - `publication_manifest.schema.json` — exact-byte publication record.
@@ -31,7 +34,8 @@ The Core validates observable production information rather than a model name or
 
 - run/candidate identity and SHA-256;
 - which evidence was actually opened;
-- production work units, dependencies, operations, and method-family applicability;
+- domain-research applicability, researched findings, confidence, and practice rules;
+- production work units, domain constraints, dependencies, operations, and method-family applicability;
 - method availability/fit and probe evidence;
 - visual/GUI observations and issues;
 - requested change depth;
@@ -46,6 +50,8 @@ BlendSmith does not require private chain-of-thought.
 Schema validation is only the first layer. Runtime invariants additionally bind contracts to the active:
 
 - run and state;
+- Domain Research revision and SHA;
+- Domain Knowledge and Domain Practice SHA bindings;
 - Method Plan revision and SHA;
 - Method Selection round and SHA;
 - environment/cache fingerprint where cached facts are cited;
@@ -56,6 +62,10 @@ Schema validation is only the first layer. Runtime invariants additionally bind 
 
 Examples:
 
+- actionable domain findings must become practice rules or be explicitly ignored;
+- Method Plan domain constraints must reproduce the exact requirement, confidence, and verification of the cited practice rule;
+- cached knowledge may reuse facts but cannot skip a fresh Domain Practice contract;
+- an explicit upstream domain reconsideration cannot immediately reuse the cache it is questioning;
 - a `LOCAL` Change Impact contract must preserve exactly the selected methods for affected work units;
 - a `METHOD` change must request reselection;
 - a revised Method Plan must supersede the exact previous plan SHA;

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.0.3 — Domain Knowledge
+
+- Added a Domain Research Gate before production planning, with explicit accounting for real-world function, dimensions, structure, manufacturing/construction process, safety/clearance, regulation/standards, and specialist practice.
+- Added SHA-bound Domain Knowledge receipts for researched findings, sources, confidence, volatility, and limitations.
+- Added a Domain Practice Gate that converts actionable findings into production rules or requires an explicit reason to ignore them.
+- Bound practice rules into Method Plan work units through immutable `domain_constraints`, so researched constraints cannot be silently forgotten or weakened during decomposition.
+- Added confidence propagation from findings to practice rules and work-unit constraints; downstream contracts cannot claim stronger confidence than their evidence.
+- Added bounded Domain Knowledge Cache with scope fingerprints, volatility-aware TTLs, cache epochs, digest checks, and recomputed validity windows.
+- Kept cached knowledge non-authoritative: every run still rebuilds Domain Practice before planning.
+- Added forced fresh-knowledge behavior when Change Impact or Global Reassessment explicitly returns upstream to Domain Research.
+- Extended Change Impact and Global Reassessment so structural/contract failures can revisit domain assumptions before replanning.
+- Extended checkpoints, resume, `blendsmith next`, CLI schemas, and the bundled Skill to preserve and expose the Domain Research → Knowledge → Practice → Method Plan authority chain.
+- Preserved v0.0.2 run compatibility while requiring the new domain fields for new v0.0.3 runs.
+- Added multi-domain virtual dogfood, adversarial cache/receipt tamper tests, package/wheel smoke tests, and private self-security review.
+
 ## 0.0.2 — Production Structure
 
 - Added the Work Unit Decomposition Gate with explicit method-family accounting.

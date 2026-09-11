@@ -26,9 +26,9 @@
 
 AIにBlenderを本気でやらせるなら、プロンプトだけ渡して「あとは賢くやって」で終わらせない。**BlendSmithを噛ませる。**
 
-BlendSmithは、Blenderを扱うAIエージェント向けの**モデル非依存プロダクションコントロールループ**です。モデルやBlender、MCP、`bpy`、GUI操作そのものを置き換えるものではありません。仕事を分解し、専用機能を先に検討し、作業同士の依存関係を持たせ、renderとGUIの両方で確認し、問題が起きたら正しい階層まで戻す。その制作判断をCore側で管理します。
+BlendSmithは、Blenderを扱うAIエージェント向けの**モデル非依存プロダクションコントロールループ**です。モデルやBlender、MCP、`bpy`、GUI操作そのものを置き換えるものではありません。現実世界の知識が必要かを先に判定し、必要なら調査結果を制作ルールへ変換する。そのうえで仕事を分解し、専用機能を先に検討し、作業同士の依存関係を持たせ、renderとGUIの両方で確認し、問題が起きたら正しい階層まで戻す。その制作判断をCore側で管理します。
 
-大事なのは、**「問題が見えた場所」と「判断を間違えた場所」は同じとは限らない**ことです。見えている不具合は小さくても、原因が作り方にあるならMethod Selectionへ戻す。構造にあるならProduction Graphまで戻す。要求そのものが違うなら上流の契約を更新する。局所修正を積み続ける前に、戻る場所を決めます。
+大事なのは、**「問題が見えた場所」と「判断を間違えた場所」は同じとは限らない**ことです。見えている不具合は小さくても、原因が作り方にあるならMethod Selectionへ戻す。構造にあるならProduction Graphまで戻す。要求そのものが違うなら上流の契約を更新する。さらに、その要求を生んだ専門知識自体が怪しいならDomain Researchまで戻る。局所修正を積み続ける前に、戻る場所を決めます。
 
 これは弱いモデルを補うための道具ではありません。強いモデルは、もうかなりの3Dを作れます。**BlendSmithは、その能力を長い制作の中で崩さず使い切るための制御層です。**
 
@@ -82,11 +82,16 @@ GPT-6 Astraを使った小規模な内部テストでは、モデル自身が候
 
 ## 制作を一周させる
 
-v0.0.2では、単純な「確認して、悪ければ直す」から一段進めました。修正に入る前に、**どの階層の判断を直すべきか**を決めます。
+v0.0.3では、制作前にも一段上流へ進みます。**その形を決める前に専門知識が必要か**を判定し、必要なら調査結果を制作ルールへ落としてからMethod Planを作ります。修正時には、これまで通り**どの階層の判断を直すべきか**を決めます。
 
 ```text
 要求
-  -> 作業を分解
+  -> Domain Research Gate
+       -> NOT_REQUIRED -> そのまま進む
+       -> RESEARCH_REQUIRED
+            -> Domain Knowledge（fresh / 有効なcache）
+            -> Domain Practice
+  -> 作業を分解 + domain_constraintsを固定
   -> Production Graph
   -> 既知のmethod familyを一通り確認
   -> Method Selection
@@ -100,6 +105,8 @@ v0.0.2では、単純な「確認して、悪ければ直す」から一段進�
                  -> METHOD     -> Method Selectionへ戻る
                  -> STRUCTURAL -> Production Graph / Method Planを更新
                  -> CONTRACT   -> 上流の要求・Planを更新
+                 -> 前提知識そのものが怪しい
+                      -> Domain Researchへ戻りfresh knowledgeを要求
        -> Render側は合格
             -> Exploratory Live GUI Review
                  -> 回す / 寄る / 裏を見る / 厚みを見る
@@ -108,6 +115,17 @@ v0.0.2では、単純な「確認して、悪ければ直す」から一段進�
   -> AI_ACCEPTED
   -> OWNER_REVIEW
 ```
+
+### 作る前に、必要な知識を確認する
+
+現実の機械、建築、家具、鉄道設備などは、見た目だけ似せても用途や構造が破綻することがあります。そこでv0.0.3では、いきなり形を作り始めません。
+
+Domain Research Gateでは、**機能、寸法、構造関係、施工・製造方法、安全・クリアランス、規格・標準、専門家の作法**の7系統をすべて`APPLICABLE / NOT_APPLICABLE`で確認します。全部`NOT_APPLICABLE`なら調査を省略できます。
+
+調査が必要なら、sourceとfindingをDomain Knowledge receiptにまとめ、actionableなfindingをDomain Practiceの制作ルールへ変換します。ルールはMethod Planの各work unitへ`domain_constraints`として入り、requirement、confidence、verificationを途中で勝手に強めたり書き換えたりできません。
+
+Knowledge Cacheは使えますが、再利用するのは事実だけです。各runでDomain Practiceは作り直します。さらにレビュー後に「そもそもの前提知識が怪しい」と判断してDomain Researchへ戻った場合、そのrevisionでは古いcacheをそのまま使えず、fresh knowledgeが必要です。
+
 
 `LOCAL`が続いたときは、途中で**Global Reassessment**を挟めます。Method Plan、Production Graph、Method Selection、現在のcandidate、未解決issue、修正履歴まで見直したうえで、「本当にもう一回だけ局所修正でいいのか」を決め直します。
 
@@ -138,6 +156,8 @@ AI_ACCEPTED != HUMAN_ACCEPTED
 | 小さな修正を重ねているうちに全体が崩れる | **Global Reassessment**で一度制作全体を見直す |
 | 固定renderは良いのに、回して見ると妙に薄い・浮いている | **Exploratory Live GUI Review**で裏側、厚み、接続、detail、material responseまで見る |
 | 同じ環境なのに毎回method探索をやり直す | **環境に紐づくDiscovery Cache**で、安全に再利用できる事実だけ使い回す |
+| 実物の用途を調べず、見た目だけもっともらしい形を作る | **Domain Research Gate**で、機能・寸法・構造・工程・安全・規格・専門作法を制作前に確認する |
+| 前提知識が怪しいと分かったのに、同じcacheをもう一度使う | **fresh domain re-entry**で、上流へ戻ったrevisionは古いcacheを即再利用せずfresh knowledgeを要求する |
 | ファイルができた時点で完成扱いする | **Evidence-backed review**で実際の画像を開いて確認する |
 | AIが「良さそう」と言ったので完成にする | AI合格と人間承認を分離する |
 | レビュー後にファイルが変わる | SHA-256でレビュー済みの正確なバイト列を固定する |
@@ -224,7 +244,10 @@ Skillは薄い操作層として作ってあります。状態遷移をプロン
 
 ```text
 preflight
-  -> Method Plan / Production Graph
+  -> Domain Research Gate
+       -> Knowledge Cache確認 / fresh research
+       -> Domain Practice
+  -> Method Plan / Production Graph + domain_constraints
   -> method familyの確認
   -> Method Selection
   -> Blender production
@@ -253,7 +276,7 @@ LOCAL修正が続いたときは、次の修正へ入る前にGlobal Reassessmen
 
 ## 中断しても、会話の記憶だけに頼らない
 
-長いBlender作業では、途中でセッションが切れたり、別のエージェントへ引き継いだりします。BlendSmithのcheckpointは、検証済みMethod Plan / Method Selection、selection round、candidate closure、ハッシュの結び付きを保存します。
+長いBlender作業では、途中でセッションが切れたり、別のエージェントへ引き継いだりします。BlendSmithのcheckpointは、必要な場合はDomain Research / Knowledge / Practiceまで含め、検証済みMethod Plan / Method Selection、selection round、candidate closure、ハッシュの結び付きを保存します。
 
 resume時にはそれらをもう一度検証します。前の会話で「たしかここまで終わっていたはず」という記憶を、そのまま権限として扱いません。
 
@@ -273,6 +296,9 @@ blendsmith status --project <project>
 契約SchemaもCLIから確認できます。
 
 ```bash
+blendsmith schema domain_research
+blendsmith schema domain_knowledge
+blendsmith schema domain_practice
 blendsmith schema method_plan
 blendsmith schema method_selection
 blendsmith schema visual_review
@@ -282,6 +308,10 @@ blendsmith schema visual_review
 
 ```bash
 blendsmith next --project <project>
+blendsmith domain-research --project <project> --input domain_research.json
+blendsmith knowledge-cache --project <project>
+blendsmith domain-knowledge --project <project> --input domain_knowledge.json
+blendsmith domain-practice --project <project> --input domain_practice.json
 blendsmith method-hints --project <project> --intent symmetry
 blendsmith method-cache --project <project> --intent symmetry
 blendsmith method-plan --project <project> --input method_plan.json
@@ -363,9 +393,9 @@ CIはWindows / Ubuntu、Python 3.11 / 3.12で実行しています。
 
 ## 現在の状態
 
-現在の公開版は**v0.0.2 — Production Structure**です。
+現在の公開版は**v0.0.3 — Domain Knowledge**です。
 
-元のreview / repair loopに、作業分解、method familyの事前確認、依存関係を持つProduction Graph、Change Impact、Method Continuity、Global Reassessment、探索型GUI Review、安全なsame-run recovery、範囲を限定したDiscovery Cache、Evidence Profile、`next`による状態確認を加えています。
+v0.0.2のProduction Structureに加え、v0.0.3ではDomain Research Gate、source-backed Domain Knowledge、Domain Practice、work unitのdomain_constraints、鮮度を制御したKnowledge Cache、前提知識まで戻るupstream re-entryを追加しています。
 
 **v0.0.1**は最初の公開版として残しています。
 

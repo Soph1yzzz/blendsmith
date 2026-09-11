@@ -1,14 +1,14 @@
-# BlendSmith v0.0.2 Specification
+# BlendSmith v0.0.3 Specification
 
-This is the authoritative public specification for BlendSmith v0.0.2.
+This is the authoritative public specification for BlendSmith v0.0.3.
 
 ## Product boundary
 
-BlendSmith is a model-independent production control loop for AI-assisted Blender work. It does not replace the model, Blender, MCP, `bpy`, or GUI automation. The Core owns lifecycle authority around them: work decomposition, method selection, candidate identity, evidence, review, change-impact classification, bounded repair, upstream revision, exploratory GUI review, checkpoint/resume, exact owner approval, retention, and verified publication.
+BlendSmith is a model-independent production control loop for AI-assisted Blender work. It does not replace the model, Blender, MCP, `bpy`, or GUI automation. The Core owns lifecycle authority around them: domain-research gating, source-backed knowledge, practice-rule binding, work decomposition, method selection, candidate identity, evidence, review, change-impact classification, bounded repair, upstream revision, exploratory GUI review, checkpoint/resume, exact owner approval, retention, and verified publication.
 
 The Core has no LLM SDK and does not infer capability from model names. A bundled Codex Skill may provide a thin host-facing operating layer, but it cannot override Core validation.
 
-Out of scope for v0.0.2: CAD workflows, domain-specific construction sequences, engineering/architecture certification, persistent cross-iteration issue-lineage state, provider-specific look-development systems, and game-engine export pipelines.
+Out of scope for v0.0.3: CAD workflows, domain-specific construction sequences, engineering/architecture certification, persistent cross-iteration issue-lineage state, provider-specific look-development systems, and game-engine export pipelines.
 
 ## Authority
 
@@ -42,6 +42,35 @@ Capability states are:
 `UNKNOWN` is never treated as `UNAVAILABLE`. A capability that was available and later fails cannot be silently downgraded to bypass a gate.
 
 Blender 5.2 LTS is the primary runtime target. Other Blender 5.x versions may proceed when runtime probing reports a compatible environment; this is not an unconditional support guarantee for every 5.x release.
+
+## Domain knowledge layer
+
+New v0.0.3 runs enter `AWAITING_DOMAIN_RESEARCH` before Method Plan authority exists.
+
+The Domain Research Gate explicitly accounts for seven families:
+
+- `REAL_WORLD_FUNCTION`
+- `DIMENSIONAL_CONSTRAINT`
+- `STRUCTURAL_RELATIONSHIP`
+- `CONSTRUCTION_OR_MANUFACTURING_PROCESS`
+- `SAFETY_OR_CLEARANCE`
+- `REGULATION_OR_STANDARD`
+- `SPECIALIST_PRACTICE`
+
+Every family is `APPLICABLE` or `NOT_APPLICABLE` with evidence. `NOT_REQUIRED` is valid only when every family is explicitly `NOT_APPLICABLE`. A required research decision names bounded topics and their volatility (`STABLE`, `SLOW_CHANGING`, or `CURRENT`).
+
+A Domain Knowledge receipt is SHA-bound to the active research receipt and records sources, findings, confidence, whether a finding is actionable, limitations, and acquisition mode. Every required topic must be covered exactly once.
+
+A Domain Practice receipt converts actionable findings into production rules or explicitly ignores them with a reason. Rule confidence cannot exceed the weakest cited finding. Method Plan work units then bind those rules as `domain_constraints`; requirement, confidence, and verification must remain equivalent to the cited practice rule.
+
+### Domain Knowledge Cache
+
+Cache identity is based on the research scope, knowledge digest, cache epoch, and volatility-aware validity policy. Core recomputes validity windows from `collected_at` and project policy rather than trusting a mutable stored expiry.
+
+Cache reuse restores knowledge facts only. It never creates Method Plan authority: the current run must still pass Domain Practice. If an upstream STRUCTURAL/CONTRACT decision explicitly requests `revisit_domain_knowledge`, the new research revision sets `domain_knowledge_fresh_required` and cache reuse is blocked until fresh knowledge is submitted.
+
+Validated Research, Knowledge, and Practice receipts are immutable by SHA for downstream authority. Checkpoints preserve the full chain.
+
 
 ## Production structure
 
@@ -102,7 +131,7 @@ Known built-in hints must be explicitly represented in the selection contract wh
 
 The cache stores reusable discovery facts, never Method Selection authority.
 
-Cache identity is bound to Core-owned environment/catalog/version/epoch information. v0.0.2 deliberately caches only discovery sources for which Core can prove a freshness boundary. Sources without such a fingerprint must be checked again.
+Cache identity is bound to Core-owned environment/catalog/version/epoch information. v0.0.3 deliberately caches only discovery sources for which Core can prove a freshness boundary. Sources without such a fingerprint must be checked again.
 
 A cached fingerprint written into a selection does not bypass normal Method Selection validation. The same current fingerprint semantics are revalidated when later candidate work relies on that selection.
 
@@ -116,6 +145,13 @@ CREATED
 -> ENVIRONMENT_PIN_RESOLVED
 -> CAPABILITY_PREFLIGHT
 -> BLENDER_PREFLIGHT
+-> AWAITING_DOMAIN_RESEARCH
+-> DOMAIN_RESEARCH_VALIDATED
+   -> AWAITING_DOMAIN_KNOWLEDGE
+   -> DOMAIN_KNOWLEDGE_VALIDATED
+   -> AWAITING_DOMAIN_PRACTICE
+   -> DOMAIN_PRACTICE_VALIDATED
+   -> or AWAITING_METHOD_PLAN when research is explicitly NOT_REQUIRED
 -> AWAITING_METHOD_PLAN
 -> METHOD_PLAN_VALIDATED
 -> AWAITING_METHOD_SELECTION
@@ -184,11 +220,11 @@ The construction method itself is wrong. The current candidate is invalidated an
 
 ### STRUCTURAL
 
-Production structure or dependencies must change. BlendSmith requires a new Method Plan revision, preserving the immutable predecessor SHA and invalidating affected downstream work before reselection and production.
+Production structure or dependencies must change. BlendSmith requires a new Method Plan revision, preserving the immutable predecessor SHA and invalidating affected downstream work before reselection and production. If the structural defect may originate in the underlying domain assumption, `revisit_domain_knowledge` returns to a new Domain Research revision first and requires fresh knowledge.
 
 ### CONTRACT
 
-The upstream requirement/plan itself must change. The old validated plan remains immutable and is superseded by a new revision before dependent work continues.
+The upstream requirement/plan itself must change. The old validated plan remains immutable and is superseded by a new revision before dependent work continues. Contract-level changes may also return to Domain Research when the knowledge that produced the requirement must be reconsidered.
 
 No `METHOD`, `STRUCTURAL`, or `CONTRACT` change may silently fall through to direct local editing.
 
@@ -198,6 +234,7 @@ Repeated local repair must not become an infinite patch stack.
 
 BlendSmith may enter `AWAITING_GLOBAL_REASSESSMENT` when local-repair streak policy or the Change Impact contract requires it. A valid reassessment must explicitly review:
 
+- Domain Research / Knowledge / Practice authority when present
 - Method Plan
 - Production Graph
 - Method Selection
@@ -256,7 +293,7 @@ A Fix Plan addresses at most two primary issues. Local repair must preserve meth
 
 ## Owner Action Recovery
 
-`OWNER_ACTION_REQUIRED` is fail-closed. v0.0.2 supports same-run recovery for supported capability failures only when a newer explicit capability observation proves the recorded condition was repaired.
+`OWNER_ACTION_REQUIRED` is fail-closed. v0.0.3 supports same-run recovery for supported capability failures only when a newer explicit capability observation proves the recorded condition was repaired.
 
 An older/stale capability snapshot, a non-explicit probe, `BROKEN`, `UNKNOWN`, or a different unsupported failure category cannot authorize same-run recovery.
 
@@ -264,7 +301,7 @@ Recovery returns to the recorded last healthy decision point; it does not jump t
 
 ## Agent introspection
 
-`blendsmith next --project <project>` exposes the next valid action plus relevant authoritative identities such as current Method Plan/Selection SHA, candidate identity, candidate path, and candidate SHA. Agents should use this surface instead of guessing managed paths or IDs.
+`blendsmith next --project <project>` exposes the next valid action plus relevant authoritative identities such as Domain Research/Knowledge/Practice SHA, current Method Plan/Selection SHA, candidate identity, candidate path, and candidate SHA. At the knowledge gate, agents can inspect cache status before deciding whether fresh acquisition is necessary.
 
 ## Retry
 
@@ -272,7 +309,7 @@ Recovery returns to the recorded last healthy decision point; it does not jump t
 
 ## Checkpoint and resume
 
-A checkpoint pins validated Method Plan and Method Selection snapshots, their SHA bindings and revision/round identity, candidate closure where present, iteration, and resume state.
+A checkpoint pins validated Domain Research / Knowledge / Practice receipts when present, Method Plan and Method Selection snapshots, their SHA bindings and revision/round identity, candidate closure where present, iteration, and resume state.
 
 Resume revalidates the checkpoint, method identities, candidate manifest, closure digest, and canonical candidate before restoring authority. Conversational memory is not treated as lifecycle authority.
 
@@ -308,6 +345,10 @@ Owner acceptance is never inferred by the Skill.
 
 Tests cover, among other cases:
 
+- Domain Research risk-family accounting and NOT_REQUIRED fail-closed behavior
+- Domain Knowledge source/scope/freshness validation and cache tamper rejection
+- Domain Practice actionable-finding accounting and confidence propagation
+- practice-rule to work-unit constraint binding and domain-research re-entry
 - decomposition family accounting and graph-cycle rejection
 - per-operation Method Selection and specialized-first policy v2
 - evidence-backed waiver behavior

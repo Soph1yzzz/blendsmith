@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blendsmith.dev/schemas/domain_research.schema.json",
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "risk_check": {
+      "type": "object",
+      "required": ["signal", "status", "evidence"],
+      "properties": {
+        "signal": {
+          "enum": [
+            "REAL_WORLD_FUNCTION",
+            "DIMENSIONAL_CONSTRAINT",
+            "STRUCTURAL_RELATIONSHIP",
+            "CONSTRUCTION_OR_MANUFACTURING_PROCESS",
+            "SAFETY_OR_CLEARANCE",
+            "REGULATION_OR_STANDARD",
+            "SPECIALIST_PRACTICE"
+          ]
+        },
+        "status": {"enum": ["APPLICABLE", "NOT_APPLICABLE"]},
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      },
+      "additionalProperties": false
+    },
+    "topic": {
+      "type": "object",
+      "required": ["topic_key", "question", "purpose", "volatility"],
+      "properties": {
+        "topic_key": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+        "question": {"type": "string", "minLength": 1},
+        "purpose": {"type": "string", "minLength": 1},
+        "volatility": {"enum": ["STABLE", "SLOW_CHANGING", "CURRENT"]}
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "revision",
+    "domain",
+    "decision",
+    "risk_signals",
+    "risk_checks",
+    "topics",
+    "rationale"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "revision": {"type": "integer", "minimum": 0},
+    "supersedes_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+    "revision_reason": {"type": ["string", "null"], "minLength": 1},
+    "domain": {"type": "string", "minLength": 1, "maxLength": 256},
+    "decision": {"enum": ["RESEARCH_REQUIRED", "NOT_REQUIRED"]},
+    "risk_signals": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "REAL_WORLD_FUNCTION",
+          "DIMENSIONAL_CONSTRAINT",
+          "STRUCTURAL_RELATIONSHIP",
+          "CONSTRUCTION_OR_MANUFACTURING_PROCESS",
+          "SAFETY_OR_CLEARANCE",
+          "REGULATION_OR_STANDARD",
+          "SPECIALIST_PRACTICE"
+        ]
+      }
+    },
+    "risk_checks": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": {"$ref": "#/$defs/risk_check"}
+    },
+    "topics": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/topic"}
+    },
+    "rationale": {"type": "string", "minLength": 1}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"revision": {"const": 0}}, "required": ["revision"]},
+      "then": {
+        "properties": {
+          "supersedes_sha256": {"type": "null"},
+          "revision_reason": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"revision": {"minimum": 1}}, "required": ["revision"]},
+      "then": {"required": ["supersedes_sha256", "revision_reason"]}
+    },
+    {
+      "if": {"properties": {"decision": {"const": "RESEARCH_REQUIRED"}}, "required": ["decision"]},
+      "then": {
+        "properties": {
+          "risk_signals": {"minItems": 1},
+          "topics": {"minItems": 1}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"decision": {"const": "NOT_REQUIRED"}}, "required": ["decision"]},
+      "then": {
+        "properties": {
+          "risk_signals": {"maxItems": 0},
+          "topics": {"maxItems": 0}
+        }
+      }
+    }
+  ],
+  "additionalProperties": false
+}

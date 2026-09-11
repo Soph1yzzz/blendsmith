@@ -35,7 +35,8 @@
     "affected_work_units",
     "rationale",
     "method_continuity",
-    "global_reassessment_recommended"
+    "global_reassessment_recommended",
+    "revisit_domain_knowledge"
   ],
   "properties": {
     "schema_version": {"const": 1},
@@ -58,6 +59,7 @@
     "rationale": {"type": "string", "minLength": 1},
     "method_continuity": {"$ref": "#/$defs/method_continuity"},
     "global_reassessment_recommended": {"type": "boolean"},
+    "revisit_domain_knowledge": {"type": "boolean"},
     "upstream_change_summary": {"type": ["string", "null"], "minLength": 1}
   },
   "allOf": [
@@ -77,9 +79,14 @@
         "properties": {
           "method_continuity": {
             "properties": {"status": {"const": "RESELECT"}}
-          }
+          },
+          "revisit_domain_knowledge": {"const": false}
         }
       }
+    },
+    {
+      "if": {"properties": {"scope": {"const": "LOCAL"}}, "required": ["scope"]},
+      "then": {"properties": {"revisit_domain_knowledge": {"const": false}}}
     },
     {
       "if": {"properties": {"source": {"enum": ["VISUAL_REVIEW", "LIVE_GUI_REVIEW"]}}, "required": ["source"]},

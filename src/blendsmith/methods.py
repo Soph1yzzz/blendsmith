@@ -22,10 +22,30 @@ def load_method_hints(intent: str | None = None) -> dict[str, Any]:
     return {"schema_version": payload["schema_version"], "families": families}
 
 
-def validate_method_plan(payload: dict[str, Any], *, run: dict[str, Any]) -> dict[str, Any]:
+def validate_method_plan(
+    payload: dict[str, Any],
+    *,
+    run: dict[str, Any],
+    domain_practice: dict[str, Any] | None = None,
+    expected_domain_practice_sha256: str | None = None,
+) -> dict[str, Any]:
     validate_contract("method_plan", payload)
     if payload["run_id"] != run["run_id"]:
         raise ContractError("Method plan run_id does not match active run")
+
+    domain_contract_required = "domain_research_revision" in run["metadata"]
+    if domain_contract_required and "domain_practice_sha256" not in payload:
+        raise ContractError("New production runs require an explicit domain_practice_sha256 field")
+    if domain_practice is None:
+        if payload.get("domain_practice_sha256") is not None:
+            raise ContractError("Method plan cites domain practice when no active domain practice exists")
+        practice_rules: dict[str, dict[str, Any]] = {}
+    else:
+        if expected_domain_practice_sha256 is None:
+            raise ContractError("Active domain practice has no authoritative SHA")
+        if payload.get("domain_practice_sha256") != expected_domain_practice_sha256:
+            raise ContractError("Method plan is not bound to the active domain practice receipt")
+        practice_rules = {rule["rule_id"]: rule for rule in domain_practice["rules"]}
 
     expected_revision = int(run["metadata"].get("method_plan_revision", 0))
     if payload["revision"] != expected_revision:
@@ -49,7 +69,16 @@ def validate_method_plan(payload: dict[str, Any], *, run: dict[str, Any]) -> dic
         family["intent"] for family in load_method_hints()["families"]
     }
     operation_ids: list[str] = []
+    constraint_ids: list[str] = []
+    referenced_practice_rules: set[str] = set()
     for unit in units:
+        if domain_contract_required:
+            if not unit.get("purpose"):
+                raise ContractError(f"Work unit {unit['work_unit_id']} requires an explicit purpose")
+            if "domain_constraints" not in unit:
+                raise ContractError(
+                    f"Work unit {unit['work_unit_id']} must explicitly include domain_constraints, even when empty"
+                )
         deps = unit["depends_on"]
         if unit["work_unit_id"] in deps:
             raise ContractError(f"Work unit {unit['work_unit_id']} cannot depend on itself")
@@ -58,6 +87,35 @@ def validate_method_plan(payload: dict[str, Any], *, run: dict[str, Any]) -> dic
             raise ContractError(
                 f"Work unit {unit['work_unit_id']} depends on unknown work units: {missing}"
             )
+        constraints = unit.get("domain_constraints", [])
+        local_constraint_ids = [item["constraint_id"] for item in constraints]
+        if len(local_constraint_ids) != len(set(local_constraint_ids)):
+            raise ContractError(f"Domain constraint IDs must be unique inside {unit['work_unit_id']}")
+        constraint_ids.extend(local_constraint_ids)
+        for constraint in constraints:
+            rule_id = constraint["practice_rule_id"]
+            rule = practice_rules.get(rule_id)
+            if rule is None:
+                raise ContractError(
+                    f"Work unit {unit['work_unit_id']} cites unknown domain practice rule {rule_id}"
+                )
+            if constraint["requirement"] != rule["requirement"]:
+                raise ContractError(
+                    "Domain constraint "
+                    f"{constraint['constraint_id']} changed the requirement from practice rule {rule_id}"
+                )
+            if constraint["confidence"] != rule["confidence"]:
+                raise ContractError(
+                    "Domain constraint "
+                    f"{constraint['constraint_id']} changed the confidence from practice rule {rule_id}"
+                )
+            if constraint["verification"] != rule["verification"]:
+                raise ContractError(
+                    "Domain constraint "
+                    f"{constraint['constraint_id']} changed the verification from practice rule {rule_id}"
+                )
+            referenced_practice_rules.add(rule_id)
+
         checks = unit["method_family_checks"]
         check_intents = [check["intent"] for check in checks]
         if len(check_intents) != len(set(check_intents)):
@@ -91,6 +149,14 @@ def validate_method_plan(payload: dict[str, Any], *, run: dict[str, Any]) -> dic
 
     if len(operation_ids) != len(set(operation_ids)):
         raise ContractError("Method operation IDs must be globally unique")
+    if len(constraint_ids) != len(set(constraint_ids)):
+        raise ContractError("Domain constraint IDs must be globally unique")
+    missing_rules = sorted(set(practice_rules) - referenced_practice_rules)
+    if missing_rules:
+        raise ContractError(
+            "Every domain practice rule must be mapped into at least one work-unit constraint: "
+            + ", ".join(missing_rules)
+        )
     _validate_acyclic_graph(units)
     return payload
 

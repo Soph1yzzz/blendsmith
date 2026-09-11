@@ -87,6 +87,37 @@ def _family_checks(*applicable: str) -> list[dict]:
     ]
 
 
+def _domain_not_required(app: BlendSmith) -> None:
+    run = app.status()
+    app.submit_domain_research(
+        {
+            "schema_version": 1,
+            "run_id": run["run_id"],
+            "revision": int(run["metadata"].get("domain_research_revision", 0)),
+            "supersedes_sha256": run["metadata"].get("previous_domain_research_sha256"),
+            "revision_reason": run["metadata"].get("pending_domain_research_revision_reason"),
+            "domain": "purely artistic test asset",
+            "decision": "NOT_REQUIRED",
+            "risk_signals": [],
+            "risk_checks": [
+                {"signal": signal, "status": "NOT_APPLICABLE", "evidence": [f"test:{signal}:not-applicable"]}
+                for signal in [
+                    "REAL_WORLD_FUNCTION",
+                    "DIMENSIONAL_CONSTRAINT",
+                    "STRUCTURAL_RELATIONSHIP",
+                    "CONSTRUCTION_OR_MANUFACTURING_PROCESS",
+                    "SAFETY_OR_CLEARANCE",
+                    "REGULATION_OR_STANDARD",
+                    "SPECIALIST_PRACTICE",
+                ]
+            ],
+            "topics": [],
+            "rationale": "This test isolates BlendSmith lifecycle behavior that does not need external domain facts.",
+        }
+    )
+    assert app.status()["state"] == "AWAITING_METHOD_PLAN"
+
+
 def _method_plan(app: BlendSmith, *, plan_id: str = "plan-main") -> dict:
     run = app.status()
     return {
@@ -96,14 +127,17 @@ def _method_plan(app: BlendSmith, *, plan_id: str = "plan-main") -> dict:
         "revision": int(run["metadata"].get("method_plan_revision", 0)),
         "supersedes_sha256": run["metadata"].get("previous_method_plan_sha256"),
         "revision_reason": run["metadata"].get("pending_plan_revision_reason"),
+        "domain_practice_sha256": run["metadata"].get("domain_practice_sha256"),
         "work_units": [
             {
                 "work_unit_id": "primary-shape",
                 "intent": "primary shape",
+                "purpose": "Provide the editable primary form for the test asset.",
                 "requirements": ["editable", "repeatable"],
                 "rationale": "Primary symmetric shape is an independent production unit.",
                 "stage": "geometry",
                 "depends_on": [],
+                "domain_constraints": [],
                 "method_family_checks": _family_checks("symmetry"),
                 "method_operations": [
                     {
@@ -157,7 +191,8 @@ def _start(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, gui: str = "UNAVA
     app = BlendSmith.init(tmp_path / "project")
     _capabilities(app, gui)
     run = app.start()
-    assert run["state"] == "AWAITING_METHOD_PLAN"
+    assert run["state"] == "AWAITING_DOMAIN_RESEARCH"
+    _domain_not_required(app)
     app.submit_method_plan(_method_plan(app))
     app.submit_method_selection(_specialized_selection(app))
     candidate = tmp_path / "scene.blend"
@@ -251,6 +286,7 @@ def _change_impact_payload(
             "evidence": ["The active method-selection receipt was inspected."],
         },
         "global_reassessment_recommended": global_reassessment_recommended,
+        "revisit_domain_knowledge": False,
         "upstream_change_summary": (
             "The upstream production structure must change."
             if scope in {"STRUCTURAL", "CONTRACT"}
@@ -267,10 +303,10 @@ def test_method_gate_waiting_state_can_checkpoint_without_candidate(
     app = BlendSmith.init(tmp_path / "project")
     _capabilities(app, "UNAVAILABLE")
     app.start()
-    checkpointed = app.checkpoint("resume method planning")
+    checkpointed = app.checkpoint("resume domain research decision")
     assert checkpointed["state"] == "RESUMABLE"
     resumed = app.resume()
-    assert resumed["state"] == "AWAITING_METHOD_PLAN"
+    assert resumed["state"] == "AWAITING_DOMAIN_RESEARCH"
     assert resumed["active_candidate_id"] is None
 
 
@@ -282,11 +318,12 @@ def test_initial_candidate_is_blocked_until_method_selection_passes(
     app = BlendSmith.init(tmp_path / "project")
     _capabilities(app, "UNAVAILABLE")
     run = app.start()
-    assert run["state"] == "AWAITING_METHOD_PLAN"
+    assert run["state"] == "AWAITING_DOMAIN_RESEARCH"
     candidate = tmp_path / "premature.blend"
     candidate.write_bytes(b"premature")
     with pytest.raises(ContractError):
         app.add_variant(candidate)
+    _domain_not_required(app)
     app.submit_method_plan(_method_plan(app))
     assert app.status()["state"] == "AWAITING_METHOD_SELECTION"
     with pytest.raises(ContractError):
@@ -657,6 +694,7 @@ def test_validated_method_plan_mutation_before_selection_is_rejected(
     app = BlendSmith.init(tmp_path / "project")
     _capabilities(app, "UNAVAILABLE")
     app.start()
+    _domain_not_required(app)
     app.submit_method_plan(_method_plan(app))
     run_dir, run = load_current_run(app.layout)
     plan_path = run_dir / run["metadata"]["method_plan_path"]
@@ -676,6 +714,7 @@ def test_validated_method_selection_mutation_before_candidate_is_rejected(
     app = BlendSmith.init(tmp_path / "project")
     _capabilities(app, "UNAVAILABLE")
     app.start()
+    _domain_not_required(app)
     app.submit_method_plan(_method_plan(app))
     app.submit_method_selection(_specialized_selection(app))
     run_dir, run = load_current_run(app.layout)

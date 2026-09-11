@@ -55,6 +55,36 @@ def _family_checks(*applicable: str) -> list[dict]:
     ]
 
 
+def _domain_not_required(app: BlendSmith) -> None:
+    run = app.status()
+    app.submit_domain_research(
+        {
+            "schema_version": 1,
+            "run_id": run["run_id"],
+            "revision": int(run["metadata"].get("domain_research_revision", 0)),
+            "supersedes_sha256": None,
+            "revision_reason": None,
+            "domain": "purely artistic cache test",
+            "decision": "NOT_REQUIRED",
+            "risk_signals": [],
+            "risk_checks": [
+                {"signal": signal, "status": "NOT_APPLICABLE", "evidence": [f"test:{signal}:not-applicable"]}
+                for signal in [
+                    "REAL_WORLD_FUNCTION",
+                    "DIMENSIONAL_CONSTRAINT",
+                    "STRUCTURAL_RELATIONSHIP",
+                    "CONSTRUCTION_OR_MANUFACTURING_PROCESS",
+                    "SAFETY_OR_CLEARANCE",
+                    "REGULATION_OR_STANDARD",
+                    "SPECIALIST_PRACTICE",
+                ]
+            ],
+            "topics": [],
+            "rationale": "Method-cache tests do not need external domain research.",
+        }
+    )
+
+
 def _plan() -> dict:
     return {
         "schema_version": 1,
@@ -63,14 +93,17 @@ def _plan() -> dict:
         "revision": 0,
         "supersedes_sha256": None,
         "revision_reason": None,
+        "domain_practice_sha256": None,
         "work_units": [
             {
                 "work_unit_id": "shape",
                 "intent": "symmetry",
+                "purpose": "Provide an editable symmetric test shape.",
                 "requirements": ["editable"],
                 "rationale": "Keep both sides mechanically linked.",
                 "stage": "geometry",
                 "depends_on": [],
+                "domain_constraints": [],
                 "method_family_checks": _family_checks("symmetry"),
                 "method_operations": [
                     {
@@ -167,6 +200,7 @@ def test_cached_discovery_selection_remains_valid_when_candidate_is_ingested(tmp
     app = BlendSmith.init(root)
     _capability_snapshot(root, "e" * 64)
     app.start()
+    _domain_not_required(app)
 
     plan = _plan()
     plan["run_id"] = app.status()["run_id"]
@@ -197,6 +231,7 @@ def test_uncacheable_discovery_source_cannot_claim_cache_authority(tmp_path: Pat
     app = BlendSmith.init(root)
     _capability_snapshot(root, "e" * 64)
     app.start()
+    _domain_not_required(app)
 
     plan = _plan()
     plan["run_id"] = app.status()["run_id"]
