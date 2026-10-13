@@ -4,7 +4,7 @@ BlendSmith evolves by moving production decisions upstream without turning the C
 
 ## v1.0.0 — Adaptive Production Loop
 
-Implemented as a development candidate; no public release is implied.
+Shipped in v1.0.0.
 
 - Reference images are pinned by SHA, kept with candidate closures, compared
   explicitly with rendered evidence, and (when part of the saved scene)

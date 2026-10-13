@@ -289,7 +289,7 @@ A resume revalidates those bindings instead of turning stale conversational memo
 
 ## Use the Core directly
 
-### Reference-guided production in the v1.0.0 development candidate
+### Reference-guided production in v1.0.0
 
 When a source photograph or concept reference is provided, register it before
 the first candidate. Core preserves its SHA, requires an actual comparison with
@@ -422,9 +422,19 @@ CI covers Python 3.11 / 3.12 on Windows and Ubuntu.
 
 ## Status
 
-**v0.0.3 — Domain Knowledge** is the current release.
+**v1.0.0 — Adaptive Production Loop** is the current release.
 
-It adds a knowledge layer before Production Structure: Domain Research decides whether specialist knowledge is required, Domain Knowledge records source-backed findings and confidence, Domain Practice turns actionable findings into production rules, and Method Plan binds them into work-unit constraints. If a later STRUCTURAL or CONTRACT failure reveals that the assumption itself may be wrong, the loop can return all the way to fresh Domain Research instead of patching around stale knowledge.
+This release adds SHA-pinned visual references, mandatory source-to-render
+comparison before visual acceptance, independently reopened Blender file
+integrity checks, compact CLI actions, Quick Tune, sparse method planning,
+and complete issue history. See the [v1.0.0 changelog](CHANGELOG.md) and
+[reference-guided workflow](docs/REFERENCE_GUIDED_PRODUCTION.md).
+
+**v0.0.3 — Domain Knowledge** added research before production decisions.
+Domain Research decides whether specialist knowledge is required, Domain
+Knowledge records source-backed findings and confidence, Domain Practice
+turns findings into production rules, and Method Plan binds them into work-unit
+constraints. Later structural or contract failures can revisit domain assumptions.
 
 **v0.0.2 — Production Structure** remains available as the release that introduced decomposition, Production Graph, Change Impact, Method Continuity, Global Reassessment, exploratory GUI review, and bounded method discovery caching. **v0.0.1** remains the first public release.
 

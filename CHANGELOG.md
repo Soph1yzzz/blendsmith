@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.0 — Adaptive Production Loop (development candidate)
+## 1.0.0 — Adaptive Production Loop
 
 - Added run-owned, SHA-256-pinned reference images with registration before candidate ingestion, inclusion in the candidate dependency closure, and fail-closed integrity checks.
 - Added mandatory, source-SHA-bound visual comparisons against rendered evidence for every registered reference before visual ACCEPT.

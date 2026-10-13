@@ -82,7 +82,7 @@ GPT-6 Astraを使った小規模な内部テストでは、モデル自身が候
 
 ## 制作を一周させる
 
-### v1.0.0 開発候補：参考画像を使う制作
+### v1.0.0：参考画像を使う制作
 
 参考画像を渡されたら、候補制作前に `reference-add` で登録します。Coreは画像のSHAと管理用コピーを固定し、**画像とレンダーを実際に見比べた記録**がなければVisual ReviewのACCEPTを拒否します。画像をBlender作品内に残す場合はパックを要求し、最終候補の`.blend`を別プロセスで開き直して欠損がないか検証します。参考画像を持ち込んだ意味が制作途中で消えることを防ぐための仕組みです。
 
@@ -409,9 +409,9 @@ CIはWindows / Ubuntu、Python 3.11 / 3.12で実行しています。
 
 ## 現在の状態
 
-現在の公開版は**v0.0.3 — Domain Knowledge**です。
+現在の公開版は**v1.0.0 — Adaptive Production Loop**です。参考画像のSHA固定、元画像とレンダーの比較必須化、保存したBlenderファイルの独立再読込、軽量なQuick Tune、制作手法の省略記法、問題履歴の保持を追加しました。詳細は[Changelog](CHANGELOG.md)と[参考画像の制作工程](docs/REFERENCE_GUIDED_PRODUCTION.md)を参照してください。
 
-v0.0.2のProduction Structureに加え、v0.0.3ではDomain Research Gate、source-backed Domain Knowledge、Domain Practice、work unitの`domain_constraints`、鮮度を制御したKnowledge Cache、前提知識まで戻るupstream re-entryを追加しています。
+**v0.0.3 — Domain Knowledge**ではDomain Research Gate、source-backed Domain Knowledge、Domain Practice、work unitの`domain_constraints`、鮮度を制御したKnowledge Cache、前提知識まで戻るupstream re-entryを追加しました。
 
 **v0.0.2 — Production Structure**もそのまま残しています。**v0.0.1**は最初の公開版です。
 
