@@ -3,6 +3,23 @@
   "$id": "https://blendsmith.dev/schemas/visual_review.schema.json",
   "$defs": {
     "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "reference_comparison": {
+      "type": "object",
+      "required": ["reference_id", "reference_sha256", "view_keys", "observations", "fidelity"],
+      "properties": {
+        "reference_id": {"type": "string", "minLength": 1},
+        "reference_sha256": {"$ref": "#/$defs/sha256"},
+        "view_keys": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "observations": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "fidelity": {"enum": ["MATCH", "ACCEPTABLE_DEVIATION", "MISMATCH"]},
+        "accepted_deviations": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      },
+      "allOf": [
+        {"if": {"properties": {"fidelity": {"const": "ACCEPTABLE_DEVIATION"}}, "required": ["fidelity"]},
+         "then": {"required": ["accepted_deviations"], "properties": {"accepted_deviations": {"minItems": 1}}}}
+      ],
+      "additionalProperties": false
+    },
     "issue": {
       "type": "object",
       "required": ["issue_id", "severity", "category", "view_keys", "observation", "likely_cause", "recommended_strategy", "regression_risk", "acceptance_test"],
@@ -38,6 +55,7 @@
     "candidate_sha256": {"$ref": "#/$defs/sha256"},
     "verdict": {"enum": ["ACCEPT", "REVISE", "BLOCKED"]},
     "opened_evidence": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "reference_comparisons": {"type": "array", "items": {"$ref": "#/$defs/reference_comparison"}},
     "perspectives_completed": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
     "issues": {"type": "array", "items": {"$ref": "#/$defs/issue"}},
     "regressions": {"type": "array", "items": {"$ref": "#/$defs/regression"}},

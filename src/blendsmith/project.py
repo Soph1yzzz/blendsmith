@@ -103,7 +103,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "method_cache_epoch": 0,
     },
     "production_structure": {
-        "global_reassessment_after_local_repairs": 2,
+        "global_reassessment_after_local_repairs": 4,
         "max_gui_quality_gain_issues": 2,
     },
     "domain_knowledge": {

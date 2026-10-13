@@ -22,10 +22,24 @@ def validate_visual_review(
     run: dict[str, Any],
     manifest_path,
     project_config: dict[str, Any],
+    references: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     validate_contract("visual_review", payload)
     manifest = verify_candidate_manifest(manifest_path)
     _assert_identity(payload, run, manifest)
+    if payload["verdict"] == "ACCEPT" and references:
+        by_id = {item["reference_id"]: item for item in references}
+        comparisons = payload.get("reference_comparisons", [])
+        if len(comparisons) != len(by_id) or {c["reference_id"] for c in comparisons} != set(by_id):
+            raise ContractError("ACCEPT requires one comparison against every pinned reference image")
+        for comparison in comparisons:
+            ref = by_id[comparison["reference_id"]]
+            if comparison["reference_sha256"] != ref["sha256"]:
+                raise IntegrityError(f"Reference comparison uses stale SHA: {comparison['reference_id']}")
+            if comparison["fidelity"] == "MISMATCH":
+                raise ContractError("An unresolved reference mismatch cannot be ACCEPTed")
+            if not set(comparison["view_keys"]).issubset(set(payload["opened_evidence"])):
+                raise ContractError("Reference comparison must cite actually opened render evidence")
 
     if payload["verdict"] == "ACCEPT":
         opened = set(payload["opened_evidence"])
@@ -164,17 +178,6 @@ def validate_live_gui_review(
         raise ContractError("GUI review capability status is stale")
     if current_capability_status in {"BROKEN", "UNKNOWN"} and payload["status"] == "SKIPPED_UNAVAILABLE":
         raise ContractError("BROKEN/UNKNOWN GUI capability cannot be skipped as unavailable")
-    meaningful_quality_gains = [
-        issue
-        for issue in payload.get("issues", [])
-        if issue.get("quality_gain") in {"MEDIUM", "HIGH"}
-    ]
-    max_quality_gains = int(
-        project_config.get("production_structure", {}).get("max_gui_quality_gain_issues", 2)
-    )
-    if len(meaningful_quality_gains) > max_quality_gains:
-        raise ContractError(
-            "GUI review exceeded the bounded quality-gain issue budget: "
-            f"max {max_quality_gains}"
-        )
+    # Record every observed problem. Fix-plan limits apply only to the active
+    # repair batch, never to the number of defects reviewers may disclose.
     return payload

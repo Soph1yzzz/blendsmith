@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from importlib import resources
 from typing import Any
 
@@ -10,6 +11,51 @@ from .method_cache import CACHEABLE_DISCOVERY_SOURCES
 
 VIABLE_FITS = {"FULL", "PARTIAL_LOCAL_REFINEMENT"}
 SETTLED_DISCOVERY = {"CHECKED", "UNAVAILABLE"}
+
+
+def expand_method_family_defaults(payload: dict[str, Any]) -> dict[str, Any]:
+    """Expand optional graph-wide negative evidence to the full immutable plan contract.
+
+    Operation intents are always APPLICABLE. All remaining catalog families are
+    accounted for with explicit graph-wide evidence, not silently omitted.
+    """
+    validate_contract("method_plan", payload)
+    defaults = payload.get("method_family_default")
+    if defaults is None:
+        if any("method_family_checks" not in unit for unit in payload["work_units"]):
+            raise ContractError("Every work unit must account for method families or use method_family_default")
+        return payload
+    if defaults.get("status") != "NOT_APPLICABLE" or not defaults.get("evidence"):
+        raise ContractError("Sparse method-family defaults require explicit NOT_APPLICABLE evidence")
+    result = deepcopy(payload)
+    result.pop("method_family_default")
+    known = [family["intent"] for family in load_method_hints()["families"]]
+    for unit in result["work_units"]:
+        operations = {operation["intent"] for operation in unit["method_operations"]}
+        overrides = {check["intent"]: check for check in unit.get("method_family_checks", [])}
+        if len(overrides) != len(unit.get("method_family_checks", [])):
+            raise ContractError(f"Duplicate sparse method-family override in {unit['work_unit_id']}")
+        expanded = []
+        for intent in known:
+            if intent in overrides:
+                expanded.append(overrides[intent])
+            elif intent in operations:
+                expanded.append({
+                    "intent": intent,
+                    "status": "APPLICABLE",
+                    "evidence": [f"Work unit {unit['work_unit_id']} declares operation intent {intent}"],
+                })
+            else:
+                expanded.append({
+                    "intent": intent,
+                    "status": "NOT_APPLICABLE",
+                    "evidence": defaults["evidence"],
+                })
+        unknown = set(overrides) - set(known)
+        if unknown:
+            raise ContractError(f"Unknown method-family overrides: {sorted(unknown)}")
+        unit["method_family_checks"] = expanded
+    return result
 
 
 def load_method_hints(intent: str | None = None) -> dict[str, Any]:
@@ -29,6 +75,7 @@ def validate_method_plan(
     domain_practice: dict[str, Any] | None = None,
     expected_domain_practice_sha256: str | None = None,
 ) -> dict[str, Any]:
+    payload = expand_method_family_defaults(payload)
     validate_contract("method_plan", payload)
     if payload["run_id"] != run["run_id"]:
         raise ContractError("Method plan run_id does not match active run")
@@ -294,24 +341,31 @@ def _validate_operation_selection(
     if len(method_ids) != len(set(method_ids)):
         raise ContractError(f"Duplicate method_id in operation {selection['operation_id']}")
     by_id = {item["method_id"]: item for item in methods}
+    selected = by_id.get(selection["selected_method_id"])
+    if selected is None:
+        raise ContractError(
+            f"Selected method {selection['selected_method_id']} was not present in candidate_methods"
+        )
+    selected_is_proven_full_specialized = (
+        selected["kind"] == "SPECIALIZED"
+        and selected["availability"] == "AVAILABLE"
+        and selected["requirement_fit"] == "FULL"
+    )
     missing_catalog_hints = sorted(set(catalog_hints) - set(by_id))
-    if missing_catalog_hints:
+    if missing_catalog_hints and not selected_is_proven_full_specialized:
         raise ContractError(
             "Known specialized method hints were omitted from evaluation: "
             + ", ".join(missing_catalog_hints)
         )
     for method_id, hint in catalog_hints.items():
+        if method_id not in by_id:
+            continue
         accounted = by_id[method_id]
         if accounted["kind"] != "SPECIALIZED" or accounted["source"] != hint["source"]:
             raise ContractError(
                 f"Known method hint {method_id} must be accounted for as SPECIALIZED from {hint['source']}"
             )
 
-    selected = by_id.get(selection["selected_method_id"])
-    if selected is None:
-        raise ContractError(
-            f"Selected method {selection['selected_method_id']} was not present in candidate_methods"
-        )
     if selected["availability"] != "AVAILABLE":
         raise ContractError("Selected production method must be AVAILABLE")
     if selected["requirement_fit"] not in VIABLE_FITS:

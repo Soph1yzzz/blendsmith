@@ -58,6 +58,15 @@
     "domain_practice_sha256": {
       "oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]
     },
+    "method_family_default": {
+      "type": "object",
+      "required": ["status", "evidence"],
+      "properties": {
+        "status": {"const": "NOT_APPLICABLE"},
+        "evidence": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+      },
+      "additionalProperties": false
+    },
     "work_units": {
       "type": "array",
       "minItems": 1,
@@ -70,7 +79,6 @@
           "rationale",
           "stage",
           "depends_on",
-          "method_family_checks",
           "method_operations"
         ],
         "properties": {
@@ -96,7 +104,6 @@
           },
           "method_family_checks": {
             "type": "array",
-            "minItems": 1,
             "items": {"$ref": "#/$defs/family_check"}
           },
           "method_operations": {

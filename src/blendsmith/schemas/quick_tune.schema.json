@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blendsmith.dev/schemas/quick_tune.schema.json",
+  "type": "object",
+  "required": ["schema_version", "run_id", "candidate_id", "candidate_sha256",
+    "issue_ids", "affected_work_units", "changes", "expected_acceptance_tests"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "candidate_id": {"type": "string", "minLength": 1},
+    "candidate_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "issue_ids": {
+      "type": "array", "minItems": 1, "maxItems": 2, "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "affected_work_units": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "changes": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["kind", "target", "description"],
+        "properties": {
+          "kind": {"enum": ["CAMERA_POSE", "CAMERA_LENS", "LIGHT_INTENSITY",
+            "LIGHT_COLOR", "MATERIAL_COLOR", "MATERIAL_NUMERIC", "SCATTER_DENSITY"]},
+          "target": {"type": "string", "minLength": 1},
+          "description": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    },
+    "expected_acceptance_tests": {
+      "type": "array", "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    }
+  },
+  "additionalProperties": false
+}

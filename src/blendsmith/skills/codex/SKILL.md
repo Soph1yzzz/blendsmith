@@ -9,7 +9,7 @@ description: >
   and publication gates. Do not invoke this
   Skill merely because a task happens to involve Blender.
 metadata:
-  version: "0.0.3"
+  version: "1.0.0"
 ---
 
 # BlendSmith
@@ -33,9 +33,10 @@ Before work:
 1. Run `blendsmith --version` and fail clearly if the CLI is unavailable.
 2. Run `blendsmith doctor`. Continue only when it returns `ready: true` and the
    installed Skill status is `CURRENT`.
-3. Use `blendsmith next --project <project>` as the primary state/introspection
-   surface. It exposes the next valid action, authoritative plan/selection hashes,
-   active candidate identity/path, and method-cache status.
+3. Use `blendsmith next --project <project> --compact` for the ordinary
+   state/introspection surface. It exposes the next action and active candidate.
+   Use the full `next` response for authoritative plan/selection hashes and
+   method-cache details when needed.
 4. Use command-specific `--help` and `blendsmith schema <contract>` whenever a
    current contract is not known exactly.
 5. Never bypass a rejected transition, stale SHA, unresolved capability,
@@ -57,8 +58,36 @@ Then capture runtime capabilities and start the run:
 
 `blendsmith start --project <project> [--blender <path>]`
 
+When actual live Blender GUI use has been observed before the run, record that
+capability explicitly during preflight with `--live-gui AVAILABLE`. Do not
+invent an observation, treat UNKNOWN as UNAVAILABLE, or bypass the existing
+reprobe/recovery protocol if GUI status later changes.
+
 Do not attach an initial candidate before Domain Research, production structure,
 and Method Selection gates are complete.
+
+## Reference-guided production (v1.0.0)
+
+When the user provides one or more visual references, register every image
+before the first candidate: `blendsmith reference-add --project <project>
+--id <id> --image <image>`. Use `blendsmith references --project <project>`
+to verify the immutable source SHA and managed path. A supplied reference
+cannot silently be ignored. Core pins a copy of each image and bundles it with
+each candidate as a dependency.
+
+By default, the reference must also be a **packed image** inside the exact
+saved .blend file; do not rely on an external file path surviving after delivery.
+If a visual reference is intentionally outside the .blend, explicitly add it
+with `--comparison-only` (comparison remains mandatory).
+
+At visual review actually inspect the pinned source image AND the corresponding
+render. Report a `reference_comparisons` entry for every source, with matching
+SHA, inspected render view keys, concrete differences and a fidelity judgment.
+Unresolved reference MISMATCH cannot be accepted; explain acceptable deviations.
+Core will independently reopen the pinned .blend in Blender and reject missing
+used images and missing/unpacked required references before AI acceptance.
+Get identity-bound starter JSON with `blendsmith template --project <project>
+--contract visual_review`; complete the observations only after viewing images.
 
 ## Domain research and practice
 
@@ -110,6 +139,10 @@ The Method Plan is a dependency-aware Production Graph. Ask:
 - what later work depends on it?
 - which operation needs a dedicated Blender method?
 
+A v1.0.0 method plan can use graph-wide `method_family_default` for shared
+NOT_APPLICABLE evidence, with explicit sparse work-unit exceptions. Core expands
+it to the complete validated contract; unaccounted families remain forbidden.
+
 A revised upstream plan must supersede the exact previous plan SHA. Never edit an
 already validated Method Plan in place.
 
@@ -131,6 +164,11 @@ Selection policy:
   the schema.
 - unresolved specialized candidates block fallback.
 - scratch construction remains the last fallback.
+
+When one fully fitting, available specialized method has already been explicitly
+probed and selected, Core no longer requires manually enumerating every catalog
+alternative. This exception does not authorize scratch/general fallback while
+specialized candidates are unknown.
 
 During later repair, preserve the already selected method when it still fits.
 Do not start hand-building a replacement for a capability that is already the
@@ -160,6 +198,12 @@ assumptions/practice, plan, graph, methods, candidate, issues, and repair histor
 before deciding whether to continue locally, reselect a method, revise structure,
 revise contract, or return all the way to Domain Research.
 
+For bounded parameter-only adjustments, `blendsmith quick-tune --project
+<project> --input <quick_tune.json>` creates the ordinary LOCAL change-impact
+and Fix Plan receipts in one CLI operation. Do not use it for geometry changes,
+structural issues, high-severity defects or owner revisions. Repeated issues,
+major regressions and accumulated repairs still cause whole-plan reassessment.
+
 ## Exploratory live GUI review
 
 `AWAITING_LIVE_GUI_REVIEW` is exploratory visual QA, not merely proof that Blender
@@ -170,8 +214,9 @@ opened. Use real GUI/computer interaction when available:
 - inspect rear/underside/occluded surfaces;
 - inspect material response where relevant;
 - look for technically valid but visually underdeveloped regions;
-- record only the highest-value bounded quality-gain issues allowed by the current
-  project policy.
+- record ALL observed issues, including quality-gain opportunities, without
+  suppressing problems to fit a batch limit. Fix Plan still limits primary
+  repairs per iteration, but the issue history preserves every observation.
 
 A GUI `REVISE` goes through Change Impact. Do not jump straight to hand edits.
 Never downgrade `BROKEN` or `UNKNOWN` GUI capability to `UNAVAILABLE`.

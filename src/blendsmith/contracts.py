@@ -23,6 +23,7 @@ SCHEMA_FILES = {
     "live_gui_review": "live_gui_review.schema.json",
     "change_impact": "change_impact.schema.json",
     "global_reassessment": "global_reassessment.schema.json",
+    "quick_tune": "quick_tune.schema.json",
     "owner_decision": "owner_decision.schema.json",
     "owner_action_required": "owner_action_required.schema.json",
     "retention_record": "retention_record.schema.json",

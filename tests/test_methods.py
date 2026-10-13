@@ -255,6 +255,30 @@ def test_method_plan_requires_every_known_method_family_to_be_accounted_for() ->
         validate_method_plan(plan, run=_run())
 
 
+def test_sparse_family_default_is_expanded_into_strict_plan() -> None:
+    plan = _plan()
+    unit = plan["work_units"][0]
+    unit["method_family_checks"] = []
+    plan["method_family_default"] = {
+        "status": "NOT_APPLICABLE",
+        "evidence": ["The other method families are not needed in these explicitly scoped work units."],
+    }
+    normalized = validate_method_plan(plan, run=_run())
+    assert "method_family_default" not in normalized
+    assert len(normalized["work_units"][0]["method_family_checks"]) == len(load_method_hints()["families"])
+    applied = {
+        item["intent"] for item in normalized["work_units"][0]["method_family_checks"]
+        if item["status"] == "APPLICABLE"
+    }
+    assert applied == {"tree_generation"}
+    with pytest.raises(ContractError, match="duplicate|Duplicate"):
+        plan["work_units"][0]["method_family_checks"] = [
+            {"intent": "symmetry", "status": "NOT_APPLICABLE", "evidence": ["x"]},
+            {"intent": "symmetry", "status": "NOT_APPLICABLE", "evidence": ["x"]},
+        ]
+        validate_method_plan(plan, run=_run())
+
+
 def test_applicable_method_family_requires_matching_operation() -> None:
     plan = _plan()
     symmetry = next(
@@ -365,3 +389,29 @@ def test_known_catalog_hint_cannot_be_disguised_as_general_purpose() -> None:
     )
     with pytest.raises(ContractError, match="must be accounted for as SPECIALIZED"):
         validate_method_selection(payload, run=_run(), plan=_plan(), project_config=_config())
+
+
+def test_full_specialized_selection_does_not_need_redundant_catalog_alternatives() -> None:
+    payload = _payload(
+        [
+            _method(
+                "tree_generator.extension",
+                kind="SPECIALIZED",
+                availability="AVAILABLE",
+                fit="FULL",
+                source="EXTENSION",
+            )
+        ],
+        "tree_generator.extension",
+        account_catalog_hints=False,
+    )
+    # A fully fitting dedicated tool was directly probed; generic/scratch fallback
+    # is not being requested, so unrelated alternatives need not be duplicated.
+    assert validate_method_selection(payload, run=_run(), plan=_plan(), project_config=_config()) == payload
+
+
+def test_unlisted_families_without_explicit_sparse_default_still_rejected() -> None:
+    plan = _plan()
+    plan["work_units"][0].pop("method_family_checks")
+    with pytest.raises(ContractError, match="must account for method families"):
+        validate_method_plan(plan, run=_run())

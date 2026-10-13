@@ -289,6 +289,18 @@ A resume revalidates those bindings instead of turning stale conversational memo
 
 ## Use the Core directly
 
+### Reference-guided production in the v1.0.0 development candidate
+
+When a source photograph or concept reference is provided, register it before
+the first candidate. Core preserves its SHA, requires an actual comparison with
+render evidence, and independently reopens the saved .blend to check required
+packed reference images. Image-guided work cannot be accepted with an unchecked
+or missing reference. See [Reference-guided production](docs/REFERENCE_GUIDED_PRODUCTION.md).
+
+v1.0.0 also offers sparse method-family accounting, compact next-action output
+and Quick Tune for parameter-only changes without bypassing the established
+review or owner-approval gates. Internal A/B benchmarks are not distributed.
+
 BlendSmith is not Codex-only. The CLI/Core is the authority; the Codex Skill is one adapter.
 
 ```bash
@@ -309,12 +321,17 @@ blendsmith schema domain_practice
 blendsmith schema method_plan
 blendsmith schema method_selection
 blendsmith schema visual_review
+blendsmith schema quick_tune
 ```
 
 Useful lifecycle commands include:
 
 ```bash
 blendsmith next --project <project>
+blendsmith next --project <project> --compact
+blendsmith reference-add --project <project> --id target --image <reference.png>
+blendsmith references --project <project>
+blendsmith template --project <project> --contract visual_review
 blendsmith domain-research --project <project> --input domain_research.json
 blendsmith knowledge-cache --project <project>
 blendsmith knowledge-cache-use --project <project>
@@ -329,6 +346,7 @@ blendsmith evidence-begin --project <project>
 blendsmith evidence-submit --project <project> --view front=<front.png>
 blendsmith visual-review --project <project> --input visual_review.json
 blendsmith change-impact --project <project> --input change_impact.json
+blendsmith quick-tune --project <project> --input quick_tune.json
 blendsmith global-reassess --project <project> --input global_reassessment.json
 blendsmith gui-review --project <project> --input live_gui_review.json
 blendsmith owner-action-recover --project <project>

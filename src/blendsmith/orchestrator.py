@@ -28,6 +28,7 @@ from .paths import append_jsonl, atomic_write_json, ensure_within
 from .project import initialize_project, load_project
 from .provenance import save_provenance, validate_for_candidate
 from .publication import publish_verified, retract_current_publication, verify_current_publication
+from .references import pin_reference, verify_references
 from .retention import RetentionRegistry
 from .review import (
     validate_change_impact,
@@ -37,6 +38,7 @@ from .review import (
     validate_visual_review,
 )
 from .run_store import create_run, load_current_run, save_run, transition
+from .scene_audit import inspect_saved_blend
 from .state_machine import RunState
 from .timeutil import iso_now, parse_iso
 
@@ -106,6 +108,91 @@ class BlendSmith:
             reason="decide whether domain knowledge is required before production planning",
         )
         return run
+
+    def add_reference(
+        self,
+        reference_id: str,
+        image: Path,
+        *,
+        require_in_blend: bool = True,
+    ) -> dict[str, Any]:
+        """Register a source image before candidate ingestion, never retroactively."""
+        run_dir, run = load_current_run(self.layout)
+        if run.get("active_candidate_id") or (run_dir / "candidates").exists() and any(
+            (run_dir / "candidates").glob("*/candidate.manifest.json")
+        ):
+            raise ContractError("Register all reference images before the first candidate is ingested")
+        if RunState(run["state"]) not in {
+            RunState.AWAITING_DOMAIN_RESEARCH,
+            RunState.AWAITING_DOMAIN_KNOWLEDGE,
+            RunState.AWAITING_DOMAIN_PRACTICE,
+            RunState.AWAITING_METHOD_PLAN,
+            RunState.AWAITING_METHOD_SELECTION,
+            RunState.WORKING,
+        }:
+            raise ContractError("Reference registration is not permitted in the current state")
+        self._verified_references(run_dir, run)
+        receipt = pin_reference(run_dir, reference_id, image, require_in_blend=require_in_blend)
+        run["metadata"]["reference_index_sha256"] = sha256_file(run_dir / "references" / "index.json")
+        save_run(run_dir, run)
+        return {"run_id": run["run_id"], "references": receipt["images"]}
+
+    def reference_status(self) -> dict[str, Any]:
+        run_dir, run = load_current_run(self.layout)
+        return {"run_id": run["run_id"], "references": self._verified_references(run_dir, run)}
+
+    def contract_template(self, contract: str) -> dict[str, Any]:
+        """Give agents identifiers from Core, but never claim evidence was opened."""
+        run_dir, run = load_current_run(self.layout)
+        if contract not in {"visual_review", "quick_tune"}:
+            raise ContractError(f"Unsupported contract template: {contract}")
+        manifest = verify_candidate_manifest(self._manifest_path(run_dir, run))
+        identity = {
+            "schema_version": 1,
+            "run_id": run["run_id"],
+            "candidate_id": manifest["candidate_id"],
+            "candidate_sha256": manifest["candidate_sha256"],
+        }
+        if contract == "visual_review":
+            return {
+                **identity,
+                "verdict": "BLOCKED",
+                "opened_evidence": [],
+                "reference_comparisons": [
+                    {
+                        "reference_id": ref["reference_id"],
+                        "reference_sha256": ref["sha256"],
+                        "view_keys": [],
+                        "observations": [],
+                        "fidelity": "MISMATCH",
+                    }
+                    for ref in self._verified_references(run_dir, run)
+                ],
+                "perspectives_completed": [],
+                "issues": [],
+                "regressions": [],
+                "uncertainties": [],
+                "next_action": "Inspect actual evidence and complete this contract.",
+            }
+        source = run["metadata"].get("change_impact_source")
+        if RunState(run["state"]) != RunState.AWAITING_CHANGE_IMPACT or source not in {
+            "VISUAL_REVIEW", "LIVE_GUI_REVIEW"
+        }:
+            raise ContractError("Quick Tune template is only available for pending visual/GUI revisions")
+        review = self._source_review_for_change_impact(run_dir, run, source)
+        return {
+            **identity,
+            "issue_ids": [item["issue_id"] for item in review["issues"][:2]],
+            "affected_work_units": [],
+            "changes": [],
+            "expected_acceptance_tests": [],
+        }
+
+    def _verified_references(self, run_dir: Path, run: dict[str, Any]) -> list[dict[str, Any]]:
+        expected = run["metadata"].get("reference_index_sha256")
+        if expected is None and (run_dir / "references" / "index.json").exists():
+            raise IntegrityError("Run has unregistered reference images without a signed index identity")
+        return verify_references(run_dir, expected)["images"]
 
     def submit_domain_research(self, payload: dict[str, Any]) -> dict[str, Any]:
         run_dir, run = load_current_run(self.layout)
@@ -261,7 +348,7 @@ class BlendSmith:
         if RunState(run["state"]) != RunState.AWAITING_METHOD_PLAN:
             raise ContractError("Method plan is not currently awaited")
         practice, practice_sha = self._validate_current_domain_authority(run_dir, run)
-        validate_method_plan(
+        payload = validate_method_plan(
             payload,
             run=run,
             domain_practice=practice,
@@ -365,11 +452,13 @@ class BlendSmith:
         limit = self.config["qa"]["max_variants_per_iteration"]
         if variant_index > limit:
             raise ContractError(f"Candidate variant budget exceeded for iteration {iteration}: max {limit}")
+        references = self._verified_references(run_dir, run)
+        pinned_references = [run_dir / item["managed_path"] for item in references]
         self._materialize_active_candidate(
             run_dir,
             run,
             candidate=Path(candidate),
-            dependencies=list(dependencies),
+            dependencies=[*dependencies, *pinned_references],
             iteration=iteration,
             variant_index=variant_index,
         )
@@ -443,10 +532,12 @@ class BlendSmith:
             run=run,
             manifest_path=manifest_path,
             project_config=self.config,
+            references=self._verified_references(run_dir, run),
         )
         path = run_dir / "reviews" / f"visual-i{run['iteration']}.json"
         atomic_write_json(path, payload)
         run["metadata"]["visual_review_path"] = path.relative_to(run_dir).as_posix()
+        self._track_review_issues(run, payload, "VISUAL_REVIEW")
         save_run(run_dir, run)
         transition(run_dir, run, RunState.VISUAL_REVIEW_VALIDATED, reason="visual review contract validated")
         if payload["verdict"] == "ACCEPT":
@@ -508,6 +599,14 @@ class BlendSmith:
         if scope == "LOCAL":
             streak = int(run["metadata"].get("local_repair_streak", 0)) + 1
             run["metadata"]["local_repair_streak"] = streak
+            last_issues = set(run["metadata"].get("last_local_issue_ids", []))
+            recurring = sorted(last_issues & set(payload["issue_ids"]))
+            run["metadata"]["last_local_issue_ids"] = payload["issue_ids"]
+            source_review = self._source_review_for_change_impact(run_dir, run, source)
+            regressed = any(
+                item.get("severity") == "major"
+                for item in (source_review or {}).get("regressions", [])
+            )
             save_run(run_dir, run)
             threshold = int(
                 self.config.get("production_structure", {}).get(
@@ -515,7 +614,7 @@ class BlendSmith:
                     2,
                 )
             )
-            if payload["global_reassessment_recommended"] or streak >= threshold:
+            if payload["global_reassessment_recommended"] or streak >= threshold or recurring or regressed:
                 transition(
                     run_dir,
                     run,
@@ -544,6 +643,83 @@ class BlendSmith:
             else:
                 self._prepare_plan_revision(run_dir, run, reason=payload["upstream_change_summary"])
         return run
+
+    def quick_tune(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Author the normal LOCAL impact and bounded fix-plan from one small contract.
+
+        This is a convenience route, not a new authority bypass. Structural or
+        method changes still require the full classification route.
+        """
+        validate_contract("quick_tune", payload)
+        run_dir, run = load_current_run(self.layout)
+        if RunState(run["state"]) != RunState.AWAITING_CHANGE_IMPACT:
+            raise ContractError("Quick Tune requires a pending visual or GUI revision")
+        source = run["metadata"].get("change_impact_source")
+        if source not in {"VISUAL_REVIEW", "LIVE_GUI_REVIEW"}:
+            raise ContractError("Owner revisions cannot be handled through Quick Tune")
+        manifest = verify_candidate_manifest(self._manifest_path(run_dir, run))
+        if payload["run_id"] != run["run_id"] or payload["candidate_id"] != manifest["candidate_id"]:
+            raise ContractError("Quick Tune identity does not match the current candidate")
+        if payload["candidate_sha256"] != manifest["candidate_sha256"]:
+            raise IntegrityError("Quick Tune candidate SHA is stale")
+        review = self._source_review_for_change_impact(run_dir, run, source)
+        issues = {item["issue_id"]: item for item in review["issues"]}
+        if any(issue not in issues for issue in payload["issue_ids"]):
+            raise ContractError("Quick Tune references unknown review issues")
+        if any(
+            issues[issue]["severity"] in {"critical", "high"}
+            or issues[issue].get("blocking")
+            or issues[issue].get("category", "").upper() in {
+                "GEOMETRY", "STRUCTURAL", "ATTACHMENT", "THICKNESS", "REFERENCE_FIDELITY"
+            }
+            for issue in payload["issue_ids"]
+        ):
+            raise ContractError("Structural, blocking, or high-severity issues require normal change-impact review")
+
+        selection = json.loads(self._method_selection_file_path(run_dir, run).read_text(encoding="utf-8"))
+        method_ids = sorted({
+            item["selected_method_id"]
+            for item in selection["selections"]
+            if item["work_unit_id"] in payload["affected_work_units"]
+        })
+        if not method_ids:
+            raise ContractError("Quick Tune work units have no authorized production methods")
+        impact = {
+            "schema_version": 1,
+            "run_id": run["run_id"],
+            "candidate_id": manifest["candidate_id"],
+            "candidate_sha256": manifest["candidate_sha256"],
+            "source": source,
+            "scope": "LOCAL",
+            "issue_ids": payload["issue_ids"],
+            "affected_work_units": payload["affected_work_units"],
+            "rationale": "Limited parameter tuning: " + "; ".join(
+                f"{item['kind']}:{item['target']}:{item['description']}" for item in payload["changes"]
+            ),
+            "method_continuity": {
+                "status": "PRESERVE",
+                "selected_method_ids": method_ids,
+                "evidence": ["The selected method is preserved; only listed existing parameters are being tuned."],
+            },
+            "global_reassessment_recommended": False,
+            "revisit_domain_knowledge": False,
+        }
+        changed = self.submit_change_impact(impact)
+        if changed["state"] == RunState.AWAITING_GLOBAL_REASSESSMENT.value:
+            return changed
+        if changed["state"] != RunState.AWAITING_FIX_PLAN.value:
+            raise ContractError("Quick Tune cannot proceed through an upstream change gate")
+        fix = {
+            "schema_version": 1,
+            "run_id": run["run_id"],
+            "candidate_id": manifest["candidate_id"],
+            "candidate_sha256": manifest["candidate_sha256"],
+            "primary_issue_ids": payload["issue_ids"],
+            "method_ids_to_preserve": method_ids,
+            "steps": [f"{item['kind']}: {item['target']} — {item['description']}" for item in payload["changes"]],
+            "expected_acceptance_tests": payload["expected_acceptance_tests"],
+        }
+        return self.submit_fix_plan(fix)
 
     def submit_global_reassessment(self, payload: dict[str, Any]) -> dict[str, Any]:
         run_dir, run = load_current_run(self.layout)
@@ -632,6 +808,7 @@ class BlendSmith:
         path = run_dir / "reviews" / f"gui-i{run['iteration']}.json"
         atomic_write_json(path, payload)
         run["metadata"]["live_gui_review_path"] = path.relative_to(run_dir).as_posix()
+        self._track_review_issues(run, payload, "LIVE_GUI_REVIEW")
         save_run(run_dir, run)
         transition(run_dir, run, RunState.LIVE_GUI_VALIDATED, reason="live GUI contract validated")
         if payload["status"] == "PASS":
@@ -660,6 +837,17 @@ class BlendSmith:
             )
         return run
 
+    @staticmethod
+    def _track_review_issues(run: dict[str, Any], review: dict[str, Any], source: str) -> None:
+        history = run["metadata"].setdefault("issue_history", [])
+        history.append({
+            "iteration": run["iteration"],
+            "source": source,
+            "candidate_sha256": review["candidate_sha256"],
+            "issue_ids": [item["issue_id"] for item in review["issues"]],
+            "issue_count": len(review["issues"]),
+        })
+
     def ai_accept(self) -> dict[str, Any]:
         run_dir, run = load_current_run(self.layout)
         if RunState(run["state"]) != RunState.FINAL_AI_VALIDATION:
@@ -672,10 +860,33 @@ class BlendSmith:
             run=run,
             manifest_path=self._manifest_path(run_dir, run),
             project_config=self.config,
+            references=self._verified_references(run_dir, run),
         )
         if review["verdict"] != "ACCEPT":
             raise ContractError("Latest visual review is not ACCEPT")
         verify_evidence_bundle(run_dir, self._evidence_path(run_dir, run))
+        references = self._verified_references(run_dir, run)
+        if references:
+            candidate_file = next(record for record in manifest["files"] if record["role"] == "candidate")
+            scene_path = self._manifest_path(run_dir, run).parent / "closure" / candidate_file["pinned_path"]
+            snapshot = latest_snapshot(self.layout)
+            executable = (snapshot or {}).get("capabilities", {}).get("blender_backend", {}).get("details", {}).get(
+                "executable"
+            )
+            if not executable:
+                raise CapabilityError("Reference-image scene audit requires an explicitly available Blender executable")
+            audit = inspect_saved_blend(executable, scene_path, references)
+            audit_record = {
+                "run_id": run["run_id"],
+                "candidate_sha256": manifest["candidate_sha256"],
+                "reference_index_sha256": run["metadata"]["reference_index_sha256"],
+                "result": audit,
+            }
+            path = run_dir / "reviews" / f"scene-audit-i{run['iteration']}.json"
+            atomic_write_json(path, audit_record)
+            run["metadata"]["scene_audit_sha256"] = sha256_file(path)
+            run["metadata"]["scene_audit_path"] = path.relative_to(run_dir).as_posix()
+            save_run(run_dir, run)
         gui_status = self._gui_capability_status()
         if gui_status == "AVAILABLE":
             gui_review = self._read_metadata_json(run_dir, run, "live_gui_review_path")
@@ -704,6 +915,16 @@ class BlendSmith:
         manifest_path = self._manifest_path(run_dir, run)
         manifest = verify_candidate_manifest(manifest_path)
         self._verify_candidate_method_binding(run_dir, run, manifest)
+        if self._verified_references(run_dir, run):
+            audit_path = self._metadata_path(run_dir, run, "scene_audit_path")
+            if sha256_file(audit_path) != run["metadata"].get("scene_audit_sha256"):
+                raise IntegrityError("Reference scene-audit receipt changed after AI validation")
+            audit = json.loads(audit_path.read_text(encoding="utf-8"))
+            if (
+                audit["candidate_sha256"] != manifest["candidate_sha256"]
+                or audit["reference_index_sha256"] != run["metadata"]["reference_index_sha256"]
+            ):
+                raise IntegrityError("Reference scene audit does not match the candidate being accepted")
         bound_sha = run["metadata"].get("owner_review_candidate_sha256")
         if candidate_sha256 != bound_sha or candidate_sha256 != manifest["candidate_sha256"]:
             raise AuthorityError("Owner ACCEPT must match the exact candidate SHA presented for review")
@@ -972,6 +1193,16 @@ class BlendSmith:
         manifest_path = self._manifest_path(run_dir, run)
         manifest = verify_candidate_manifest(manifest_path)
         self._verify_candidate_method_binding(run_dir, run, manifest)
+        if self._verified_references(run_dir, run):
+            audit_path = self._metadata_path(run_dir, run, "scene_audit_path")
+            if sha256_file(audit_path) != run["metadata"].get("scene_audit_sha256"):
+                raise IntegrityError("Reference audit changed before publication")
+            audit = json.loads(audit_path.read_text(encoding="utf-8"))
+            if (
+                audit["candidate_sha256"] != manifest["candidate_sha256"]
+                or audit["reference_index_sha256"] != run["metadata"]["reference_index_sha256"]
+            ):
+                raise IntegrityError("Reference audit no longer matches accepted artifact")
         provenance = None
         if run["metadata"].get("provenance_path"):
             provenance = self._read_metadata_json(run_dir, run, "provenance_path")
@@ -1093,6 +1324,12 @@ class BlendSmith:
             "method_selection_sha256": run["metadata"].get("method_selection_sha256"),
             "method_cache": load_method_cache(self.layout, self.config),
             "active_candidate_id": run.get("active_candidate_id"),
+            "reference_ids": [
+                item["reference_id"] for item in self._verified_references(run_dir, run)
+            ],
+            "issue_history_count": sum(
+                item["issue_count"] for item in run["metadata"].get("issue_history", [])
+            ),
         }
         if run.get("active_candidate_id"):
             manifest_path = self._manifest_path(run_dir, run)

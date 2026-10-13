@@ -92,6 +92,20 @@ def build_parser() -> argparse.ArgumentParser:
     domain_practice.add_argument("--project", required=True)
     domain_practice.add_argument("--input", required=True)
 
+    ref_add = sub.add_parser("reference-add", help="Pin an image that must be compared with final renders")
+    ref_add.add_argument("--project", required=True)
+    ref_add.add_argument("--id", required=True)
+    ref_add.add_argument("--image", required=True)
+    ref_add.add_argument(
+        "--comparison-only", action="store_true",
+        help="Reference remains outside Blender; still required in visual comparison",
+    )
+    refs = sub.add_parser("references", help="Verify and show all pinned reference images")
+    refs.add_argument("--project", required=True)
+    template = sub.add_parser("template", help="Draft a SHA-bound contract without fabricating review evidence")
+    template.add_argument("--project", required=True)
+    template.add_argument("--contract", choices=["visual_review", "quick_tune"], required=True)
+
     hints = sub.add_parser("method-hints", help="Show provider-neutral method discovery hints")
     hints.add_argument("--project", required=True)
     hints.add_argument("--intent")
@@ -113,6 +127,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     nxt = sub.add_parser("next", help="Show the next valid BlendSmith action and authoritative identities")
     nxt.add_argument("--project", required=True)
+    nxt.add_argument("--compact", action="store_true", help="Return the small agent-oriented action summary")
 
     recover = sub.add_parser(
         "owner-action-recover",
@@ -154,6 +169,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ci.add_argument("--project", required=True)
     ci.add_argument("--input", required=True)
+
+    qt = sub.add_parser("quick-tune", help="Create bounded LOCAL impact and fix plan for safe parameter tuning")
+    qt.add_argument("--project", required=True)
+    qt.add_argument("--input", required=True)
 
     gra = sub.add_parser("global-reassess", help="Submit a whole-plan reassessment when local repair should pause")
     gra.add_argument("--project", required=True)
@@ -260,6 +279,14 @@ def main(argv: list[str] | None = None) -> int:
             result = app.submit_domain_knowledge(_json_file(args.input))
         elif args.command == "domain-practice":
             result = app.submit_domain_practice(_json_file(args.input))
+        elif args.command == "reference-add":
+            result = app.add_reference(
+                args.id, Path(args.image), require_in_blend=not args.comparison_only,
+            )
+        elif args.command == "references":
+            result = app.reference_status()
+        elif args.command == "template":
+            result = app.contract_template(args.contract)
         elif args.command == "method-hints":
             result = app.method_hints(args.intent)
         elif args.command == "method-cache":
@@ -272,6 +299,10 @@ def main(argv: list[str] | None = None) -> int:
             result = app.status()
         elif args.command == "next":
             result = app.next_action()
+            if args.compact:
+                kept = ("run_id", "state", "iteration", "next_command", "active_candidate_id",
+                        "candidate_sha256", "candidate_path", "reference_ids", "issue_history_count")
+                result = {key: result[key] for key in kept if key in result}
         elif args.command == "owner-action-recover":
             result = app.recover_owner_action()
         elif args.command in {"candidate-add", "variant-add"}:
@@ -289,6 +320,8 @@ def main(argv: list[str] | None = None) -> int:
             result = app.submit_visual_review(_json_file(args.input))
         elif args.command == "change-impact":
             result = app.submit_change_impact(_json_file(args.input))
+        elif args.command == "quick-tune":
+            result = app.quick_tune(_json_file(args.input))
         elif args.command == "global-reassess":
             result = app.submit_global_reassessment(_json_file(args.input))
         elif args.command == "fix-plan":

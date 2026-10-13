@@ -82,6 +82,12 @@ GPT-6 Astraを使った小規模な内部テストでは、モデル自身が候
 
 ## 制作を一周させる
 
+### v1.0.0 開発候補：参考画像を使う制作
+
+参考画像を渡されたら、候補制作前に `reference-add` で登録します。Coreは画像のSHAと管理用コピーを固定し、**画像とレンダーを実際に見比べた記録**がなければVisual ReviewのACCEPTを拒否します。画像をBlender作品内に残す場合はパックを要求し、最終候補の`.blend`を別プロセスで開き直して欠損がないか検証します。参考画像を持ち込んだ意味が制作途中で消えることを防ぐための仕組みです。
+
+同時に、制作グラフの省略記法、`next --compact`、小規模なパラメータ調整用の`quick-tune`を追加しました。厳格な変更分類や人間の承認を無効化するものではありません。詳しくは [参考画像を使う制作](docs/REFERENCE_GUIDED_PRODUCTION.md) を参照してください。比較ベンチマークは開発者専用として公開配布に含めません。
+
 v0.0.3では、制作前にも一段上流へ進みます。**その形を決める前に専門知識が必要か**を判定し、必要なら調査結果を制作ルールへ落としてからMethod Planを作ります。修正時には、これまで通り**どの階層の判断を直すべきか**を決めます。
 
 ```text
@@ -302,12 +308,17 @@ blendsmith schema domain_practice
 blendsmith schema method_plan
 blendsmith schema method_selection
 blendsmith schema visual_review
+blendsmith schema quick_tune
 ```
 
 主なライフサイクルコマンド:
 
 ```bash
 blendsmith next --project <project>
+blendsmith next --project <project> --compact
+blendsmith reference-add --project <project> --id target --image <reference.png>
+blendsmith references --project <project>
+blendsmith template --project <project> --contract visual_review
 blendsmith domain-research --project <project> --input domain_research.json
 blendsmith knowledge-cache --project <project>
 blendsmith knowledge-cache-use --project <project>
@@ -322,6 +333,7 @@ blendsmith evidence-begin --project <project>
 blendsmith evidence-submit --project <project> --view front=<front.png>
 blendsmith visual-review --project <project> --input visual_review.json
 blendsmith change-impact --project <project> --input change_impact.json
+blendsmith quick-tune --project <project> --input quick_tune.json
 blendsmith global-reassess --project <project> --input global_reassessment.json
 blendsmith gui-review --project <project> --input live_gui_review.json
 blendsmith owner-action-recover --project <project>

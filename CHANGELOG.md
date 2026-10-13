@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.0 — Adaptive Production Loop (development candidate)
+
+- Added run-owned, SHA-256-pinned reference images with registration before candidate ingestion, inclusion in the candidate dependency closure, and fail-closed integrity checks.
+- Added mandatory, source-SHA-bound visual comparisons against rendered evidence for every registered reference before visual ACCEPT.
+- Added independent Blender background reopen validation of the accepted scene and required packed references, with SHA-bound audit receipts checked before owner approval and publication.
+- Added `next --compact`, source-bound `template` drafts, and a bounded `quick-tune` convenience route that preserves the existing LOCAL impact / Fix Plan authority chain.
+- Added graph-wide sparse NOT_APPLICABLE method-family accounting, canonically expanded before method-plan approval.
+- Reduced redundant alternative enumeration when a probed, fully fitting specialized method is already selected; fallback remains strict.
+- Record every visual/GUI issue without forcing the reviewer to suppress issues to meet the fix-batch budget.
+- Expanded automatic whole-plan reconsideration to repeated issue IDs and major regressions, and raised the default LOCAL repair streak limit to four.
+- Kept developer-only A/B benchmarks and large test scenes out of the public package.
+- Preserved the separation between AI acceptance and SHA-locked owner acceptance.
+
 ## 0.0.3 — Domain Knowledge
 
 - Added a Domain Research Gate before production planning, with explicit accounting for real-world function, dimensions, structure, manufacturing/construction process, safety/clearance, regulation/standards, and specialist practice.

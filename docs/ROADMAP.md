@@ -2,6 +2,24 @@
 
 BlendSmith evolves by moving production decisions upstream without turning the Core into a domain-specific expert system.
 
+## v1.0.0 — Adaptive Production Loop
+
+Implemented as a development candidate; no public release is implied.
+
+- Reference images are pinned by SHA, kept with candidate closures, compared
+  explicitly with rendered evidence, and (when part of the saved scene)
+  independently verified as packed data in the reopened Blender file
+- Graph-wide sparse method-family defaults reduce repetitive accounting
+- Fully fitting specialized methods no longer require listing unrelated hints
+- Quick Tune minimizes JSON ceremony for ordinary parameter adjustments while
+  reusing strict existing LOCAL / Fix Plan state transitions
+- Compact next-action output and identity-bound review/tuning templates
+- All observed review issues are retained, independently of repair-batch limits
+- Repeated defects and regressions can trigger whole-plan reassessment
+
+Developer-only benchmark infrastructure is intentionally omitted from the public
+repository; benchmark conclusions must not be inferred from ordinary tests.
+
 ## v0.0.3 — Domain Knowledge
 
 v0.0.3 adds a knowledge layer before production structure. The loop can now ask whether real-world or specialist knowledge is needed, acquire or safely reuse that knowledge, convert it into actionable practice rules, and bind those rules into work-unit constraints before Method Selection begins.

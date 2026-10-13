@@ -365,6 +365,7 @@ def test_local_repair_keeps_validated_method_selection(
     app.begin_evidence()
     app.submit_evidence({"front": Path("unused.png")})
     review = _revision_visual_payload(app)
+    review["issues"][0]["category"] = "material"
     app.submit_visual_review(review)
     assert app.status()["state"] == "AWAITING_CHANGE_IMPACT"
     app.submit_change_impact(_change_impact_payload(app, "LOCAL"))
@@ -489,7 +490,7 @@ def test_live_gui_available_requires_strict_pass(tmp_path: Path, monkeypatch: py
     assert app.status()["assurance_level"] == "live_gui_verified"
 
 
-def test_live_gui_revise_requires_real_interaction_and_bounds_quality_gain_issues(
+def test_live_gui_revise_requires_interaction_but_records_all_quality_gain_issues(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -542,12 +543,9 @@ def test_live_gui_revise_requires_real_interaction_and_bounds_quality_gain_issue
             for index in range(1, 4)
         ],
     }
-    with pytest.raises(ContractError, match="quality-gain issue budget"):
-        app.submit_gui_review(too_many)
-
-    valid = {**too_many, "issues": too_many["issues"][:2]}
-    app.submit_gui_review(valid)
+    app.submit_gui_review(too_many)
     assert app.status()["state"] == "AWAITING_CHANGE_IMPACT"
+    assert app.status()["metadata"]["issue_history"][-1]["issue_count"] == 3
 
 
 def test_next_action_exposes_authoritative_candidate_path_and_next_command(
@@ -566,6 +564,55 @@ def test_next_action_exposes_authoritative_candidate_path_and_next_command(
     nxt = app.next_action()
     assert nxt["state"] == "RENDERING_EVIDENCE"
     assert "evidence-submit" in nxt["next_command"]
+
+
+def test_quick_tune_uses_existing_impact_and_fix_gates(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = _start(tmp_path, monkeypatch)
+    app.begin_evidence()
+    app.submit_evidence({"front": Path("unused.png")})
+    review = _revision_visual_payload(app)
+    review["issues"][0]["category"] = "material"
+    app.submit_visual_review(review)
+    payload = {
+        "schema_version": 1,
+        "run_id": review["run_id"],
+        "candidate_id": review["candidate_id"],
+        "candidate_sha256": review["candidate_sha256"],
+        "issue_ids": ["shape-1"],
+        "affected_work_units": ["primary-shape"],
+        "changes": [
+            {"kind": "MATERIAL_NUMERIC", "target": "roughness", "description": "increase slightly"}
+        ],
+        "expected_acceptance_tests": ["Compare the new evidence from the same camera."],
+    }
+    assert app.quick_tune(payload)["state"] == "WORKING"
+    assert app.status()["metadata"]["local_repair_streak"] == 1
+
+
+def test_quick_tune_rejects_high_severity_or_structural_issue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = _start(tmp_path, monkeypatch)
+    app.begin_evidence()
+    app.submit_evidence({"front": Path("unused.png")})
+    review = _revision_visual_payload(app)
+    review["issues"][0]["severity"] = "high"
+    app.submit_visual_review(review)
+    payload = {
+        "schema_version": 1,
+        "run_id": review["run_id"],
+        "candidate_id": review["candidate_id"],
+        "candidate_sha256": review["candidate_sha256"],
+        "issue_ids": ["shape-1"],
+        "affected_work_units": ["primary-shape"],
+        "changes": [{"kind": "CAMERA_POSE", "target": "Camera", "description": "move closer"}],
+        "expected_acceptance_tests": ["Retake the front view."],
+    }
+    with pytest.raises(ContractError, match="Structural, blocking, or high-severity"):
+        app.quick_tune(payload)
+    assert app.status()["state"] == "AWAITING_CHANGE_IMPACT"
 
 
 def test_live_gui_owner_action_can_recover_same_run_after_explicit_reprobe(
