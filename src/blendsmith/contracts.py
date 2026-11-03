@@ -19,6 +19,8 @@ SCHEMA_FILES = {
     "method_plan": "method_plan.schema.json",
     "method_selection": "method_selection.schema.json",
     "visual_review": "visual_review.schema.json",
+    "quality_targets": "quality_targets.schema.json",
+    "quality_assessment": "quality_assessment.schema.json",
     "fix_plan": "fix_plan.schema.json",
     "live_gui_review": "live_gui_review.schema.json",
     "change_impact": "change_impact.schema.json",

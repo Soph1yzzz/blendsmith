@@ -102,9 +102,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     refs = sub.add_parser("references", help="Verify and show all pinned reference images")
     refs.add_argument("--project", required=True)
+    targets = sub.add_parser("quality-targets", help="Register immutable part-level reference targets and probes")
+    targets.add_argument("--project", required=True)
+    targets.add_argument("--input", required=True)
+    qstatus = sub.add_parser("quality-status", help="Inspect quality targets and pinned best-so-far")
+    qstatus.add_argument("--project", required=True)
     template = sub.add_parser("template", help="Draft a SHA-bound contract without fabricating review evidence")
     template.add_argument("--project", required=True)
-    template.add_argument("--contract", choices=["visual_review", "quick_tune"], required=True)
+    template.add_argument("--contract", choices=["visual_review", "quick_tune", "quality_assessment"], required=True)
 
     hints = sub.add_parser("method-hints", help="Show provider-neutral method discovery hints")
     hints.add_argument("--project", required=True)
@@ -158,6 +163,13 @@ def build_parser() -> argparse.ArgumentParser:
     es = sub.add_parser("evidence-submit", help="Copy and verify evidence images")
     es.add_argument("--project", required=True)
     es.add_argument("--view", action="append", default=[], help="KEY=PATH; repeat for each view")
+
+    qa = sub.add_parser("quality-assess", help="Assess features, run contact probes, and consider best promotion")
+    qa.add_argument("--project", required=True)
+    qa.add_argument("--input", required=True)
+
+    restore = sub.add_parser("best-restore", help="Restore the exact best candidate in the active iteration")
+    restore.add_argument("--project", required=True)
 
     vr = sub.add_parser("visual-review", help="Submit an external visual-review contract")
     vr.add_argument("--project", required=True)
@@ -285,6 +297,10 @@ def main(argv: list[str] | None = None) -> int:
             )
         elif args.command == "references":
             result = app.reference_status()
+        elif args.command == "quality-targets":
+            result = app.add_quality_targets(_json_file(args.input))
+        elif args.command == "quality-status":
+            result = app.quality_status()
         elif args.command == "template":
             result = app.contract_template(args.contract)
         elif args.command == "method-hints":
@@ -301,7 +317,8 @@ def main(argv: list[str] | None = None) -> int:
             result = app.next_action()
             if args.compact:
                 kept = ("run_id", "state", "iteration", "next_command", "active_candidate_id",
-                        "candidate_sha256", "candidate_path", "reference_ids", "issue_history_count")
+                        "candidate_sha256", "candidate_path", "reference_ids", "issue_history_count",
+                        "quality_best_sha256", "quality_targets_sha256")
                 result = {key: result[key] for key in kept if key in result}
         elif args.command == "owner-action-recover":
             result = app.recover_owner_action()
@@ -316,6 +333,10 @@ def main(argv: list[str] | None = None) -> int:
             result = app.begin_evidence()
         elif args.command == "evidence-submit":
             result = app.submit_evidence(_views(args.view))
+        elif args.command == "quality-assess":
+            result = app.submit_quality_assessment(_json_file(args.input))
+        elif args.command == "best-restore":
+            result = app.restore_best_candidate()
         elif args.command == "visual-review":
             result = app.submit_visual_review(_json_file(args.input))
         elif args.command == "change-impact":

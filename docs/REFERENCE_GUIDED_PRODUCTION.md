@@ -1,4 +1,11 @@
-# Reference-guided production (v1.0.0)
+# Reference-guided production (v1.0.0 foundation, v1.1.0 quality loop)
+
+In new v1.1.0 runs, register a quality_targets contract after registering all source
+images and before candidate ingestion. Every source needs one or more part-level
+features and required render views. After evidence submission and before visual
+ACCEPT, submit a quality_assessment comparing those parts to the original and
+the best-so-far candidate. See [Quality Improvement Loop](QUALITY_IMPROVEMENT_LOOP.md).
+Older v1.0.0 runs keep their prior acceptance behavior.
 
 When an image is supplied as an actual production target, it must survive the
 entire BlendSmith lifecycle. Saving a render without ever looking back at the

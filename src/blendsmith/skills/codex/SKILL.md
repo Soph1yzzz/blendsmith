@@ -9,7 +9,7 @@ description: >
   and publication gates. Do not invoke this
   Skill merely because a task happens to involve Blender.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # BlendSmith
@@ -66,7 +66,32 @@ reprobe/recovery protocol if GUI status later changes.
 Do not attach an initial candidate before Domain Research, production structure,
 and Method Selection gates are complete.
 
-## Reference-guided production (v1.0.0)
+## Quality Improvement Loop (v1.1.0)
+
+For new runs with visual references, before the first candidate use
+`blendsmith quality-targets --project <project> --input <targets.json>`.
+First pin all source images and obtain their exact SHAs. The quality-targets
+contract must specify what each part should reproduce, the required render views,
+inference/uncertainty, and explicit geometry checks or the reason none apply.
+Every reference image needs a target. Do not use a generic whole-object PASS to
+hide visible differences in high-priority parts.
+
+After submitting render evidence and before visual ACCEPT, use
+`blendsmith template --project <project> --contract quality_assessment`
+and fill it by genuinely comparing the original, current render and pinned best.
+When promoting a new best, use a genuinely separate evaluator context; inventing
+distinct context IDs does not prove independence. `blendsmith quality-assess`
+records all target comparisons, runs declared evaluated-mesh proximity checks, and
+blocks promotion on stated regressions, unknown comparisons, or structural failure.
+Use `blendsmith quality-status` to inspect the best and `blendsmith best-restore`
+only while WORKING and with unchanged method authority.
+
+This loop records visual judgment and enforces evidence integrity. It does not
+mathematically guarantee that a candidate is more attractive or manufacturable.
+An empty geometry-check list needs an explicit rationale; do not silently omit
+a relevant attachment or seam. See docs/QUALITY_IMPROVEMENT_LOOP.md.
+
+## Reference-guided production (v1.0.0 foundation)
 
 When the user provides one or more visual references, register every image
 before the first candidate: `blendsmith reference-add --project <project>
