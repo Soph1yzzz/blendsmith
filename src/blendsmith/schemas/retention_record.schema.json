@@ -8,7 +8,7 @@
     "schema_version": {"const": 1},
     "record_id": {"type": "string", "minLength": 1},
     "relative_path": {"type": "string", "minLength": 1},
-    "class": {"enum": ["PINNED_INSTALLATION", "PINNED_ENVIRONMENT", "PINNED_ACTIVE_CHECKPOINT", "PINNED_CURRENT_FINAL", "EPHEMERAL", "EPHEMERAL_SUPERSEDED_FINAL", "LIGHTWEIGHT_HISTORY"]},
+    "class": {"enum": ["PINNED_INSTALLATION", "PINNED_ENVIRONMENT", "PINNED_ACTIVE_CHECKPOINT", "PINNED_CURRENT_FINAL", "PINNED_QUALITY_BEST", "EPHEMERAL", "EPHEMERAL_SUPERSEDED_FINAL", "LIGHTWEIGHT_HISTORY"]},
     "sha256": {"$ref": "#/$defs/sha256"},
     "gc_allowed": {"type": "boolean"},
     "created_at": {"type": "string", "format": "date-time"},
@@ -17,7 +17,7 @@
   },
   "allOf": [
     {
-      "if": {"properties": {"class": {"enum": ["PINNED_INSTALLATION", "PINNED_ENVIRONMENT", "PINNED_ACTIVE_CHECKPOINT", "PINNED_CURRENT_FINAL", "LIGHTWEIGHT_HISTORY"]}}, "required": ["class"]},
+      "if": {"properties": {"class": {"enum": ["PINNED_INSTALLATION", "PINNED_ENVIRONMENT", "PINNED_ACTIVE_CHECKPOINT", "PINNED_CURRENT_FINAL", "PINNED_QUALITY_BEST", "LIGHTWEIGHT_HISTORY"]}}, "required": ["class"]},
       "then": {"properties": {"gc_allowed": {"const": false}, "expires_at": {"type": "null"}}}
     },
     {

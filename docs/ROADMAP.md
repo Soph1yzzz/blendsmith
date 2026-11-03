@@ -2,6 +2,21 @@
 
 BlendSmith evolves by moving production decisions upstream without turning the Core into a domain-specific expert system.
 
+## v1.1.0 — Quality Improvement Loop
+
+Shipped in v1.1.0:
+
+- SHA-bound part-level feature targets, required in new image-guided runs
+- candidate-vs-best comparisons, independent-evaluator context metadata, and a pinned best-so-far candidate
+- a fail-closed promotion gate for reported regressions or missing geometric contact evidence
+- evaluated-mesh proximity checks in an independent Blender process, with explicit per-asset limits
+- safe reingestion of a best candidate when the method-selection authority remains identical
+- part-level visual acceptance, CLI/Skill integration and unit tests
+
+Human and model judgments about visual fidelity remain subjective. Next development
+should test true quality gains in private blind paired A/B production across varied
+assets and equal compute/time budgets. Tests of the contract are not that benchmark.
+
 ## v1.0.0 — Adaptive Production Loop
 
 Shipped in v1.0.0.

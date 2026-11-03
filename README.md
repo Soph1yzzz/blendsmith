@@ -81,6 +81,19 @@ In a small internal dogfood run with **GPT-6 Astra** on an ornate sword task, th
   <img src="docs/assets/blendsmith-astra-dogfood.png" alt="BlendSmith GPT-6 Astra dogfood proof panel" width="100%">
 </p>
 
+## New in v1.1.0 — Quality Improvement Loop
+
+The control loop now carries **part-level reference targets** into candidate review.
+It preserves the best **assessed** candidate, compares every new candidate against
+that pinned baseline, rejects an explicitly regressed promotion, and can run
+read-only Blender geometry proximity checks for declared part relationships.
+
+The evaluator still has to genuinely inspect the source and renders. The Core
+validates evidence coverage and identities; it does not pretend to be an
+infallible aesthetic judge. See [Quality Improvement Loop](docs/QUALITY_IMPROVEMENT_LOOP.md)
+for the complete contracts and the new `quality-targets`, `quality-assess`,
+`quality-status`, and `best-restore` commands.
+
 ## The production loop
 
 v0.0.3 extends the production loop one level further upstream: before planning, BlendSmith can decide whether domain research is needed, bind researched knowledge into production rules, and later return to that knowledge layer when an assumption proves suspect.

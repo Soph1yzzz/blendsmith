@@ -27,12 +27,34 @@ def _image(path: Path) -> Path:
     return path
 
 
-def _guided_working_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> BlendSmith:
+def _guided_working_app(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, geometry_checks: list[dict] | None = None
+) -> BlendSmith:
     _fake_evidence(monkeypatch)
+    monkeypatch.setattr(
+        "blendsmith.quality_runtime.verify_evidence_bundle",
+        lambda run_dir, bundle_path: {"views": [{"key": "front"}]},
+    )
     app = BlendSmith.init(tmp_path / "project")
     _capabilities(app, "UNAVAILABLE")
     app.start()
     app.add_reference("main-photo", _image(tmp_path / "photo.png"))
+    ref = app.reference_status()["references"][0]
+    app.add_quality_targets({
+        "schema_version": 1,
+        "targets": [{
+            "target_id": "handle-shape",
+            "reference_id": "main-photo",
+            "reference_sha256": ref["sha256"],
+            "part": "handle",
+            "features": ["band thickness and mounting"],
+            "view_keys": ["front"],
+            "priority": "HIGH",
+            "inferred": False,
+        }],
+        "geometry_checks": geometry_checks or [],
+        "geometry_check_rationale": "Explicit test-only proximity policy.",
+    })
     _domain_not_required(app)
     app.submit_method_plan(_method_plan(app))
     app.submit_method_selection(_specialized_selection(app))
@@ -40,6 +62,19 @@ def _guided_working_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Blen
     candidate.write_bytes(b"fake-test-scene")
     app.add_variant(candidate)
     return app
+
+
+def _promote_quality(app: BlendSmith) -> None:
+    assessment = app.contract_template("quality_assessment")
+    assert assessment["decision"] == "HOLD"
+    assessment["creator_context_id"] = "producer-session"
+    assessment["reviewer_context_id"] = "independent-session"
+    assessment["opened_evidence"] = ["front"]
+    assessment["target_results"][0]["observations"] = ["Compared handle shape against the original image."]
+    assessment["target_results"][0]["fidelity"] = "MATCH"
+    assessment["target_results"][0]["confidence"] = "HIGH"
+    assessment["decision"] = "PROMOTE"
+    app.submit_quality_assessment(assessment)
 
 
 def test_reference_image_receipt_fails_closed_on_tamper(tmp_path: Path) -> None:
@@ -77,6 +112,7 @@ def test_accept_requires_real_reference_comparison(
     app = _guided_working_app(tmp_path, monkeypatch)
     app.begin_evidence()
     app.submit_evidence({"front": tmp_path / "dummy.png"})
+    _promote_quality(app)
     template = app.contract_template("visual_review")
     assert template["verdict"] == "BLOCKED"
     assert template["opened_evidence"] == []
@@ -131,6 +167,7 @@ def test_acceptance_receipt_tamper_is_rejected(
     app = _guided_working_app(tmp_path, monkeypatch)
     app.begin_evidence()
     app.submit_evidence({"front": tmp_path / "unused.png"})
+    _promote_quality(app)
     review = _accepted_visual_payload(app)
     ref = app.reference_status()["references"][0]
     review["reference_comparisons"] = [{

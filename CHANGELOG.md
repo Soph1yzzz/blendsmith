@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.1.0 — Quality Improvement Loop
+
+- Added immutable, SHA-bound part-level reference targets for every registered image in new image-guided runs.
+- Added quality assessment receipts tied to the exact candidate, reference targets, opened render views, and best-so-far SHA.
+- Added best-so-far promotion with explicit non-regression rules, distinct creator/evaluator context identifiers, immutable receipts, and pinned retention.
+- Added best candidate restoration into active iterations when Method Selection authority matches.
+- Added optional independent Blender evaluated-mesh maximum proximity probes for named part interfaces; failures block promotion.
+- Made feature-level acceptance fail closed on mismatches, missing assessments and failed declared structural checks; old runs remain compatible.
+- Added end-to-end contract, regression, tamper and geometry-probe tests; large private A/B fixtures remain out of the public package.
+- The Core does not authenticate external evaluator independence or guarantee subjective quality dominance.
+
+
 ## 1.0.0 — Adaptive Production Loop
 
 - Added run-owned, SHA-256-pinned reference images with registration before candidate ingestion, inclusion in the candidate dependency closure, and fail-closed integrity checks.

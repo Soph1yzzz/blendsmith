@@ -28,6 +28,8 @@ from .paths import append_jsonl, atomic_write_json, ensure_within
 from .project import initialize_project, load_project
 from .provenance import save_provenance, validate_for_candidate
 from .publication import publish_verified, retract_current_publication, verify_current_publication
+from .quality import store_targets, verified_targets
+from .quality_runtime import assess, require_ready, restore_best
 from .references import pin_reference, verify_references
 from .retention import RetentionRegistry
 from .review import (
@@ -100,6 +102,7 @@ class BlendSmith:
         run["metadata"]["method_plan_revision"] = 0
         run["metadata"]["local_repair_streak"] = 0
         run["metadata"]["method_plan_history"] = []
+        run["metadata"]["quality_loop_version"] = 1
         save_run(run_dir, run)
         transition(
             run_dir,
@@ -132,6 +135,8 @@ class BlendSmith:
         }:
             raise ContractError("Reference registration is not permitted in the current state")
         self._verified_references(run_dir, run)
+        if run["metadata"].get("quality_targets_sha256"):
+            raise ContractError("Reference images are locked after quality targets are registered")
         receipt = pin_reference(run_dir, reference_id, image, require_in_blend=require_in_blend)
         run["metadata"]["reference_index_sha256"] = sha256_file(run_dir / "references" / "index.json")
         save_run(run_dir, run)
@@ -141,10 +146,60 @@ class BlendSmith:
         run_dir, run = load_current_run(self.layout)
         return {"run_id": run["run_id"], "references": self._verified_references(run_dir, run)}
 
+    def add_quality_targets(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Declare measurable reference features and optional contact probes before production."""
+        run_dir, run = load_current_run(self.layout)
+        if any((run_dir / "candidates").glob("*/candidate.manifest.json")):
+            raise ContractError("Feature targets must be registered before the first candidate")
+        allowed = {
+            RunState.AWAITING_DOMAIN_RESEARCH, RunState.AWAITING_DOMAIN_KNOWLEDGE,
+            RunState.AWAITING_DOMAIN_PRACTICE, RunState.AWAITING_METHOD_PLAN,
+            RunState.AWAITING_METHOD_SELECTION, RunState.WORKING,
+        }
+        if RunState(run["state"]) not in allowed:
+            raise ContractError("Feature targets cannot be registered in this run state")
+        references = self._verified_references(run_dir, run)
+        digest = store_targets(run_dir, payload, references)
+        run["metadata"]["quality_targets_sha256"] = digest
+        save_run(run_dir, run)
+        return {"run_id": run["run_id"], "quality_targets_sha256": digest, "targets": payload}
+
+    def _verified_quality_targets(self, run_dir: Path, run: dict[str, Any]) -> dict[str, Any] | None:
+        return verified_targets(
+            run_dir, run["metadata"].get("quality_targets_sha256"),
+            self._verified_references(run_dir, run),
+        )
+
+    def _verified_quality_best(self, run_dir: Path, run: dict[str, Any]) -> dict[str, Any] | None:
+        best = run["metadata"].get("quality_best")
+        if not best:
+            return None
+        path = ensure_within(run_dir, run_dir / best["manifest_path"])
+        manifest = verify_candidate_manifest(path)
+        if manifest["candidate_id"] != best["candidate_id"] or manifest["candidate_sha256"] != best["candidate_sha256"]:
+            raise IntegrityError("Best-so-far candidate identity was modified")
+        receipt_path = ensure_within(run_dir, run_dir / best["assessment_path"])
+        if not receipt_path.is_file() or sha256_file(receipt_path) != best["assessment_sha256"]:
+            raise IntegrityError("Best-so-far quality assessment was modified")
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        if (receipt["assessment"]["candidate_sha256"] != best["candidate_sha256"]
+                or receipt["assessment"]["decision"] != "PROMOTE"):
+            raise IntegrityError("Best-so-far assessment no longer matches candidate")
+        return best
+
+    def quality_status(self) -> dict[str, Any]:
+        run_dir, run = load_current_run(self.layout)
+        return {
+            "run_id": run["run_id"],
+            "targets_sha256": run["metadata"].get("quality_targets_sha256"),
+            "targets": self._verified_quality_targets(run_dir, run),
+            "best": self._verified_quality_best(run_dir, run),
+        }
+
     def contract_template(self, contract: str) -> dict[str, Any]:
         """Give agents identifiers from Core, but never claim evidence was opened."""
         run_dir, run = load_current_run(self.layout)
-        if contract not in {"visual_review", "quick_tune"}:
+        if contract not in {"visual_review", "quick_tune", "quality_assessment"}:
             raise ContractError(f"Unsupported contract template: {contract}")
         manifest = verify_candidate_manifest(self._manifest_path(run_dir, run))
         identity = {
@@ -153,6 +208,29 @@ class BlendSmith:
             "candidate_id": manifest["candidate_id"],
             "candidate_sha256": manifest["candidate_sha256"],
         }
+        if contract == "quality_assessment":
+            targets = self._verified_quality_targets(run_dir, run)
+            if not targets:
+                raise ContractError("Register feature targets before drafting quality assessment")
+            best = self._verified_quality_best(run_dir, run)
+            return {
+                **identity,
+                "targets_sha256": run["metadata"]["quality_targets_sha256"],
+                "compared_to_sha256": best["candidate_sha256"] if best else None,
+                "creator_context_id": "",
+                "reviewer_context_id": "",
+                "opened_evidence": [],
+                "target_results": [{
+                    "target_id": target["target_id"],
+                    "view_keys": target["view_keys"],
+                    "observations": [],
+                    "fidelity": "MISMATCH",
+                    "delta": "INCOMPARABLE" if best else "BASELINE",
+                    "confidence": "LOW",
+                } for target in targets["targets"]],
+                "decision": "HOLD",
+                "rationale": "Inspect reference, candidate and best-so-far evidence before assessing.",
+            }
         if contract == "visual_review":
             return {
                 **identity,
@@ -453,6 +531,14 @@ class BlendSmith:
         if variant_index > limit:
             raise ContractError(f"Candidate variant budget exceeded for iteration {iteration}: max {limit}")
         references = self._verified_references(run_dir, run)
+        if (
+            references
+            and run["metadata"].get("quality_loop_version") == 1
+            and self._verified_quality_targets(run_dir, run) is None
+        ):
+            raise ContractError(
+                "v1.1.0 image-guided production requires feature targets before candidate ingestion"
+            )
         pinned_references = [run_dir / item["managed_path"] for item in references]
         self._materialize_active_candidate(
             run_dir,
@@ -478,8 +564,13 @@ class BlendSmith:
             raise ContractError("Only a candidate from the active iteration may be selected")
         run["active_candidate_id"] = candidate_id
         run["metadata"]["candidate_manifest_path"] = manifest_path.relative_to(run_dir).as_posix()
+        run["metadata"].pop("quality_assessment_path", None)
+        run["metadata"].pop("quality_assessment_sha256", None)
         save_run(run_dir, run)
         return run
+
+    def restore_best_candidate(self) -> dict[str, Any]:
+        return restore_best(self)
 
     def begin_evidence(self) -> dict[str, Any]:
         run_dir, run = load_current_run(self.layout)
@@ -516,6 +607,9 @@ class BlendSmith:
         transition(run_dir, run, RunState.AWAITING_VISUAL_REVIEW, reason="external visual review required")
         return run
 
+    def submit_quality_assessment(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return assess(self, payload)
+
     def submit_visual_review(self, payload: dict[str, Any]) -> dict[str, Any]:
         run_dir, run = load_current_run(self.layout)
         if RunState(run["state"]) != RunState.AWAITING_VISUAL_REVIEW:
@@ -527,6 +621,8 @@ class BlendSmith:
         unknown_opened = set(payload.get("opened_evidence", [])) - known_views
         if unknown_opened:
             raise ContractError(f"Visual review cites unknown evidence: {sorted(unknown_opened)}")
+        if payload.get("verdict") == "ACCEPT":
+            require_ready(self, run_dir, run)
         validate_visual_review(
             payload,
             run=run,
@@ -855,6 +951,7 @@ class BlendSmith:
         manifest = verify_candidate_manifest(self._manifest_path(run_dir, run))
         self._verify_candidate_method_binding(run_dir, run, manifest)
         review = self._read_metadata_json(run_dir, run, "visual_review_path")
+        require_ready(self, run_dir, run)
         validate_visual_review(
             review,
             run=run,
@@ -915,6 +1012,7 @@ class BlendSmith:
         manifest_path = self._manifest_path(run_dir, run)
         manifest = verify_candidate_manifest(manifest_path)
         self._verify_candidate_method_binding(run_dir, run, manifest)
+        require_ready(self, run_dir, run)
         if self._verified_references(run_dir, run):
             audit_path = self._metadata_path(run_dir, run, "scene_audit_path")
             if sha256_file(audit_path) != run["metadata"].get("scene_audit_sha256"):
@@ -1308,6 +1406,13 @@ class BlendSmith:
             command = "blendsmith domain-knowledge --project <project> --input <domain_knowledge.json>"
         else:
             command = commands.get(state)
+        if run["metadata"].get("quality_loop_version") == 1 and self._verified_references(run_dir, run):
+            if (state == RunState.WORKING and not run.get("active_candidate_id")
+                    and not run["metadata"].get("quality_targets_sha256")):
+                command = "blendsmith quality-targets --project <project> --input <targets.json>"
+            elif (state == RunState.AWAITING_VISUAL_REVIEW
+                  and not run["metadata"].get("quality_assessment_path")):
+                command = "blendsmith quality-assess --project <project> --input <assessment.json>"
 
         result: dict[str, Any] = {
             "run_id": run["run_id"],
@@ -1327,6 +1432,8 @@ class BlendSmith:
             "reference_ids": [
                 item["reference_id"] for item in self._verified_references(run_dir, run)
             ],
+            "quality_best_sha256": run["metadata"].get("quality_best", {}).get("candidate_sha256"),
+            "quality_targets_sha256": run["metadata"].get("quality_targets_sha256"),
             "issue_history_count": sum(
                 item["issue_count"] for item in run["metadata"].get("issue_history", [])
             ),
@@ -1418,6 +1525,8 @@ class BlendSmith:
         )
         run["active_candidate_id"] = manifest["candidate_id"]
         run["metadata"]["candidate_manifest_path"] = manifest_path.relative_to(run_dir).as_posix()
+        run["metadata"].pop("quality_assessment_path", None)
+        run["metadata"].pop("quality_assessment_sha256", None)
         return manifest
 
     def _seed_replacement(self, run_dir: Path, run: dict[str, Any], manifest_path: Path):
