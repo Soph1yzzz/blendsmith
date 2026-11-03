@@ -7,7 +7,6 @@ import pytest
 
 from blendsmith.cli import _json_file, main
 from blendsmith.errors import ContractError
-from blendsmith.version import __version__
 from blendsmith.skill_install import (
     bundled_skill_bytes,
     bundled_skill_sha256,
@@ -16,6 +15,7 @@ from blendsmith.skill_install import (
     install_codex_skill,
     skill_status,
 )
+from blendsmith.version import __version__
 
 
 def test_bundled_skill_is_thin_codex_adapter() -> None:

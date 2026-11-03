@@ -8,13 +8,16 @@ import pytest
 from test_lifecycle import (
     _accepted_visual_payload,
     _capabilities,
+    _change_impact_payload,
     _domain_not_required,
     _fake_evidence,
     _method_plan,
+    _revision_visual_payload,
     _specialized_selection,
 )
 from test_reference_images import _guided_working_app, _image, _promote_quality
 
+from blendsmith.closure import verify_candidate_manifest
 from blendsmith.errors import ContractError, IntegrityError
 from blendsmith.geometry_audit import inspect_contact_proximity
 from blendsmith.orchestrator import BlendSmith
@@ -32,6 +35,29 @@ def _assessment(app: BlendSmith) -> dict:
     payload["target_results"][0]["confidence"] = "HIGH"
     payload["decision"] = "PROMOTE"
     return payload
+
+
+def test_references_locked_after_quality_targets(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _fake_evidence(monkeypatch)
+    app = BlendSmith.init(tmp_path / "project")
+    _capabilities(app, "UNAVAILABLE")
+    app.start()
+    app.add_reference("first-photo", _image(tmp_path / "first.png"))
+    first = app.reference_status()["references"][0]
+    app.add_quality_targets({
+        "schema_version": 1,
+        "targets": [{
+            "target_id": "profile", "reference_id": "first-photo",
+            "reference_sha256": first["sha256"], "part": "main form",
+            "features": ["outline"], "view_keys": ["front"],
+            "priority": "HIGH", "inferred": False,
+        }],
+        "geometry_checks": [], "geometry_check_rationale": "No structural checks needed.",
+    })
+    with pytest.raises(ContractError, match="locked after quality targets"):
+        app.add_reference("late-photo", _image(tmp_path / "late.png"))
 
 
 def test_new_reference_run_requires_targets_before_candidate(
@@ -97,6 +123,37 @@ def test_regression_and_uncertainty_cannot_displace_best(
         )
     assert app.quality_status()["best"] == best
     assert run_dir.is_dir()
+
+
+def test_restore_best_after_local_revision_preserves_pinned_candidate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = _guided_working_app(tmp_path, monkeypatch)
+    app.begin_evidence()
+    app.submit_evidence({"front": tmp_path / "unused.png"})
+    _promote_quality(app)
+    best = app.quality_status()["best"]
+    review = _revision_visual_payload(app)
+    app.submit_visual_review(review)
+    app.submit_change_impact(_change_impact_payload(app, "LOCAL"))
+    app.submit_fix_plan({
+        "schema_version": 1,
+        "run_id": review["run_id"],
+        "candidate_id": review["candidate_id"],
+        "candidate_sha256": review["candidate_sha256"],
+        "primary_issue_ids": ["shape-1"],
+        "method_ids_to_preserve": ["modifier.mirror"],
+        "steps": ["Use the preserved selected method to restore the best-known scene."],
+        "expected_acceptance_tests": ["Best-known candidate SHA is retained."],
+    })
+    restored = app.restore_best_candidate()
+    assert restored["state"] == "WORKING"
+    assert restored["iteration"] == 1
+    assert restored["active_candidate_id"] != best["candidate_id"]
+    run_dir, run = load_current_run(app.layout)
+    manifest = verify_candidate_manifest(run_dir / run["metadata"]["candidate_manifest_path"])
+    assert manifest["candidate_sha256"] == best["candidate_sha256"]
+    assert app.quality_status()["best"] == best
 
 
 def test_visual_accept_requires_promoted_quality_and_tamper_proof(

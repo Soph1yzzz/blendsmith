@@ -135,6 +135,8 @@ class BlendSmith:
         }:
             raise ContractError("Reference registration is not permitted in the current state")
         self._verified_references(run_dir, run)
+        if run["metadata"].get("quality_targets_sha256"):
+            raise ContractError("Reference images are locked after quality targets are registered")
         receipt = pin_reference(run_dir, reference_id, image, require_in_blend=require_in_blend)
         run["metadata"]["reference_index_sha256"] = sha256_file(run_dir / "references" / "index.json")
         save_run(run_dir, run)
