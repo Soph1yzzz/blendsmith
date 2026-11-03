@@ -27,9 +27,9 @@ from .methods import load_method_hints, validate_method_plan, validate_method_se
 from .paths import append_jsonl, atomic_write_json, ensure_within
 from .project import initialize_project, load_project
 from .provenance import save_provenance, validate_for_candidate
+from .publication import publish_verified, retract_current_publication, verify_current_publication
 from .quality import store_targets, verified_targets
 from .quality_runtime import assess, require_ready, restore_best
-from .publication import publish_verified, retract_current_publication, verify_current_publication
 from .references import pin_reference, verify_references
 from .retention import RetentionRegistry
 from .review import (
@@ -529,11 +529,14 @@ class BlendSmith:
         if variant_index > limit:
             raise ContractError(f"Candidate variant budget exceeded for iteration {iteration}: max {limit}")
         references = self._verified_references(run_dir, run)
-        if references and run["metadata"].get("quality_loop_version") == 1:
-            if self._verified_quality_targets(run_dir, run) is None:
-                raise ContractError(
-                    "v1.1.0 image-guided production requires feature targets before candidate ingestion"
-                )
+        if (
+            references
+            and run["metadata"].get("quality_loop_version") == 1
+            and self._verified_quality_targets(run_dir, run) is None
+        ):
+            raise ContractError(
+                "v1.1.0 image-guided production requires feature targets before candidate ingestion"
+            )
         pinned_references = [run_dir / item["managed_path"] for item in references]
         self._materialize_active_candidate(
             run_dir,
