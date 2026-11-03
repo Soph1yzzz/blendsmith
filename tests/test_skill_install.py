@@ -7,6 +7,7 @@ import pytest
 
 from blendsmith.cli import _json_file, main
 from blendsmith.errors import ContractError
+from blendsmith.version import __version__
 from blendsmith.skill_install import (
     bundled_skill_bytes,
     bundled_skill_sha256,
@@ -20,13 +21,13 @@ from blendsmith.skill_install import (
 def test_bundled_skill_is_thin_codex_adapter() -> None:
     text = bundled_skill_bytes().decode("utf-8")
     assert "name: blendsmith" in text
-    assert 'version: "1.0.0"' in text
+    assert f'version: "{__version__}"' in text
     assert "BlendSmithを使って" in text
     assert "CLI/Core is the source of truth" in text
     assert "AI_ACCEPTED != HUMAN_ACCEPTED" in text
     assert "blendsmith schema <contract>" in text
     assert "blendsmith doctor" in text
-    assert bundled_skill_version() == "1.0.0"
+    assert bundled_skill_version() == __version__
 
 
 def test_skill_install_create_status_and_noop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

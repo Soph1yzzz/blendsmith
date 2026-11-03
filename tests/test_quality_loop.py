@@ -136,6 +136,9 @@ def test_objective_geometry_failure_blocks_promotion_but_allows_hold(
         "check_id": "seam-contact", "status": "FAIL",
         "max_distance_mm": 1.8, "vertices_inspected": 20, "reason": "Gap too large",
     }]
+    monkeypatch.setattr("blendsmith.quality_runtime.latest_snapshot", lambda layout: {
+        "capabilities": {"blender_backend": {"details": {"executable": "test-blender"}}},
+    })
     monkeypatch.setattr("blendsmith.quality_runtime.inspect_contact_proximity", lambda *a, **kw: observed)
     with pytest.raises(ContractError, match="failed contact"):
         app.submit_quality_assessment(_assessment(app))
